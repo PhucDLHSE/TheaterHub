@@ -1,4 +1,4 @@
 module.exports = {
-  admins: ['phucunv@gmail.com'],
-  staff: ['staff1@gmail.com']
+  admins: ['phucdlhse171826@fpt.edu.vn'],
+  staff: ['phucunv@gmail.com']
 };

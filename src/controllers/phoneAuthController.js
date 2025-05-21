@@ -1,6 +1,7 @@
 const pool = require('../config/db');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const formatUserPayload = require('../utils/formatUserPayload');
 
 const registerWithPhone = async (req, res) => {
   const { name, phone, password } = req.body;
@@ -19,14 +20,23 @@ const registerWithPhone = async (req, res) => {
       [name, phone, hashedPassword, 'customer']
     );
 
-    const newUser = { user_id: result.insertId, name, phone, role: 'customer' };
-    const token = jwt.sign(newUser, process.env.JWT_SECRET, { expiresIn: '7d' });
+    const newUser = {
+      user_id: result.insertId,
+      name,
+      phone,
+      email: null,
+      avatar: null,
+      role: 'customer'
+    };
+
+    const payload = formatUserPayload(newUser);
+    const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '7d' });
 
     res.status(201).json({
       success: true,
       message: 'Đăng ký thành công',
       token,
-      user: newUser
+      user: payload
     });
   } catch (error) {
     console.error('Lỗi đăng ký:', error);
@@ -51,29 +61,14 @@ const loginWithPhone = async (req, res) => {
     if (!isMatch)
       return res.status(401).json({ success: false, message: 'Sai mật khẩu' });
 
-    const token = jwt.sign(
-      {
-        user_id: user.user_id,
-        name: user.name,
-        email: user.email,
-        phone: user.phone,
-        role: user.role
-      },
-      process.env.JWT_SECRET,
-      { expiresIn: '7d' }
-    );
+    const payload = formatUserPayload(user);
+    const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '7d' });
 
     res.json({
       success: true,
       message: 'Đăng nhập thành công',
       token,
-      user: {
-        user_id: user.user_id,
-        name: user.name,
-        email: user.email,
-        phone: user.phone,
-        role: user.role
-      }
+      user: payload
     });
   } catch (error) {
     console.error('Lỗi đăng nhập:', error);
