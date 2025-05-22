@@ -1,19 +1,9 @@
 const jwt = require('jsonwebtoken');
 
-// Middleware
-const ensureAuth = (req, res, next) => {
-  if (req.isAuthenticated()) return next();
-  res.status(401).json({ success: false, message: 'Bạn cần đăng nhập để truy cập' });
-};
-
-const ensureAdmin = (req, res, next) => {
-  if (req.isAuthenticated() && req.user.role === 'admin') return next();
-  res.status(403).json({ success: false, message: 'Không đủ quyền truy cập' });
-};
-
-// Google Callback
+// Callback từ Google OAuth sau khi xác thực thành công
 const googleCallback = (req, res) => {
   const user = req.user;
+
   const payload = {
     user_id: user.user_id,
     avatar: user.avatar,
@@ -23,7 +13,9 @@ const googleCallback = (req, res) => {
     phone: user.phone || null
   };
 
-  const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '7d' });
+  const token = jwt.sign(payload, process.env.JWT_SECRET, {
+    expiresIn: '7d'
+  });
 
   res.json({
     success: true,
@@ -33,7 +25,7 @@ const googleCallback = (req, res) => {
   });
 };
 
-// Login thất bại
+// Đăng nhập thất bại
 const loginFailed = (req, res) => {
   res.status(401).json({
     success: false,
@@ -43,18 +35,10 @@ const loginFailed = (req, res) => {
   });
 };
 
-// Logout
-const logout = (req, res, next) => {
-  req.logout((err) => {
-    if (err) return next(err);
-    res.json({ success: true, message: 'Đăng xuất thành công' });
-  });
-};
-
-// Trạng thái đăng nhập
+// Trạng thái đăng nhập từ token (JWT-based)
 const getStatus = (req, res) => {
-  if (req.isAuthenticated()) {
-    res.json({
+  if (req.user) {
+    return res.json({
       isAuthenticated: true,
       user: {
         id: req.user.user_id,
@@ -63,12 +47,16 @@ const getStatus = (req, res) => {
         role: req.user.role
       }
     });
-  } else {
-    res.json({ isAuthenticated: false });
   }
+  res.status(401).json({ isAuthenticated: false });
 };
 
-// Profile
+// Đăng xuất (JWT → client chỉ cần xoá token)
+const logout = (req, res) => {
+  res.json({ success: true, message: 'Đăng xuất thành công (xóa token phía client)' });
+};
+
+// Route lấy thông tin cá nhân
 const getProfile = (req, res) => {
   res.json({
     success: true,
@@ -77,12 +65,13 @@ const getProfile = (req, res) => {
       name: req.user.name,
       email: req.user.email,
       role: req.user.role,
-      google_id: req.user.google_id
+      google_id: req.user.google_id,
+      avatar: req.user.avatar
     }
   });
 };
 
-// Admin Dashboard
+// Trang quản trị (chỉ dành cho admin)
 const getAdminDashboard = (req, res) => {
   res.json({
     success: true,
@@ -101,7 +90,5 @@ module.exports = {
   logout,
   getStatus,
   getProfile,
-  getAdminDashboard,
-  ensureAuth,
-  ensureAdmin
+  getAdminDashboard
 };

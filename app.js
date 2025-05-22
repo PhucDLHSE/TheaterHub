@@ -1,5 +1,4 @@
 const express = require('express');
-const session = require('express-session');
 const passport = require('passport');
 const cors = require('cors');
 const dotenv = require('dotenv');
@@ -28,20 +27,8 @@ app.use(cors({
   credentials: true
 }));
 
-// Cấu hình session
-app.use(session({
-  secret: process.env.SESSION_SECRET || 'theaterhub_secret',
-  resave: false,
-  saveUninitialized: false,
-  cookie: {
-    secure: process.env.NODE_ENV === 'production',
-    maxAge: 24 * 60 * 60 * 1000 // 1 ngày
-  }
-}));
-
 // Khởi tạo passport
 app.use(passport.initialize());
-app.use(passport.session());
 configurePassport(passport);
 
 // Routes API
