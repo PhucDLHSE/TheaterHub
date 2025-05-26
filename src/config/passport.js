@@ -3,11 +3,9 @@ const pool = require('./db');
 const dotenv = require('dotenv');
 const whitelist = require('./roleWhitelist');
 
-
 module.exports = function (passport) {
   if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET || !process.env.GOOGLE_CALLBACK_URL) {
     console.error('CẢNH BÁO: Thiếu các biến môi trường cho Google OAuth. Hãy kiểm tra file .env');
-    console.error('Cần có: GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_CALLBACK_URL');
   }
 
   passport.use(new GoogleStrategy({
@@ -16,7 +14,6 @@ module.exports = function (passport) {
     callbackURL: process.env.GOOGLE_CALLBACK_URL
   }, async (accessToken, refreshToken, profile, done) => {
     try {
-      console.log('Google OAuth callback được gọi thành công');
       const email = profile.emails[0].value;
       const name = profile.displayName;
       const avatar = profile.photos[0]?.value || null;
@@ -30,7 +27,6 @@ module.exports = function (passport) {
       if (rows.length > 0) {
         const user = rows[0];
 
-        // Nếu thông tin thay đổi, cập nhật lại
         if (user.email !== email || user.name !== name || user.role !== role || user.avatar !== avatar) {
           await pool.query(
             'UPDATE users SET name = ?, email = ?, role = ?, avatar = ? WHERE user_id = ?',
@@ -42,65 +38,50 @@ module.exports = function (passport) {
           user.avatar = avatar;
         }
 
+        user.statusType = 'existingGoogle';
         return done(null, user);
       } else {
         const [existingUsers] = await pool.query('SELECT * FROM users WHERE email = ?', [email]);
 
         if (existingUsers.length > 0) {
+          const user = existingUsers[0];
+
+          if (user.provider === 'local') {
+            const message = `Email ${email} đã đăng ký bằng email/password, không thể đăng nhập Google.`;
+            return done(null, false, { message });
+          }
+
           await pool.query(
             'UPDATE users SET google_id = ?, role = ?, avatar = ? WHERE user_id = ?',
-            [profile.id, role, avatar, existingUsers[0].user_id]
+            [profile.id, role, avatar, user.user_id]
           );
 
           const updatedUser = {
-            ...existingUsers[0],
+            ...user,
             google_id: profile.id,
             role,
-            avatar
+            avatar,
+            statusType: 'linkedExisting'
+          };
+          return done(null, updatedUser);
+
+        } else {
+          const [result] = await pool.query(
+            'INSERT INTO users (name, email, google_id, role, avatar, provider) VALUES (?, ?, ?, ?, ?, ?)',
+            [name, email, profile.id, role, avatar, 'google']
+          );
+
+          const newUser = {
+            user_id: result.insertId,
+            name,
+            email,
+            google_id: profile.id,
+            role,
+            avatar,
+            statusType: 'newGoogle'
           };
 
-          return done(null, updatedUser);
-        } else {
-          try {
-            const [result] = await pool.query(
-              'INSERT INTO users (name, email, google_id, role, avatar) VALUES (?, ?, ?, ?, ?)',
-              [name, email, profile.id, role, avatar]
-            );
-
-            const newUser = {
-              user_id: result.insertId,
-              name,
-              email,
-              google_id: profile.id,
-              role,
-              avatar
-            };
-
-            return done(null, newUser);
-          } catch (insertError) {
-            console.error('Lỗi khi thêm người dùng:', insertError);
-
-            try {
-              const [result] = await pool.query(
-                'INSERT INTO users (name, email, google_id, avatar) VALUES (?, ?, ?, ?)',
-                [name, email, profile.id, avatar]
-              );
-
-              const newUser = {
-                user_id: result.insertId,
-                name,
-                email,
-                google_id: profile.id,
-                role,
-                avatar
-              };
-
-              return done(null, newUser);
-            } catch (secondError) {
-              console.error('Không thể thêm người dùng:', secondError);
-              return done(secondError, null);
-            }
-          }
+          return done(null, newUser);
         }
       }
     } catch (err) {

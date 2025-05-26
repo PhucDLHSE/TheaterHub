@@ -8,8 +8,9 @@ const whitelist = require('./src/config/roleWhitelist');
 
 const authRoutes = require('./src/routes/GoogleAuthRoutes');
 const userRoutes = require('./src/routes/userRoutes');
-const phoneAuthRoutes = require('./src/routes/phoneAuthRoutes');
+// const phoneAuthRoutes = require('./src/routes/phoneAuthRoutes');
 const phoneOtpRoutes = require('./src/routes/phoneOtpRoutes');
+const emailAuthRoutes = require('./src/routes/emailAuthRoutes');
 
 // Đọc biến môi trường
 dotenv.config();
@@ -35,8 +36,9 @@ configurePassport(passport);
 // Routes API
 app.use('/auth', authRoutes);
 app.use('/api/users', userRoutes);
-app.use('/api/phone-auth', phoneAuthRoutes);  
+// app.use('/api/phone-auth', phoneAuthRoutes);  
 app.use('/api/phone-otp', phoneOtpRoutes);
+app.use('/api/email-auth', emailAuthRoutes);
 
 // Route chính
 app.get('/', (req, res) => {

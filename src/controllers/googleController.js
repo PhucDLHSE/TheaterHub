@@ -1,31 +1,48 @@
 const jwt = require('jsonwebtoken');
 
-// Callback từ Google OAuth sau khi xác thực thành công
 const googleCallback = (req, res) => {
-  const user = req.user;
+  try {
+    const user = req.user;
 
-  const payload = {
-    user_id: user.user_id,
-    avatar: user.avatar,
-    name: user.name,
-    email: user.email,
-    role: user.role,
-    phone: user.phone || null
-  };
+    const payload = {
+      user_id: user.user_id,
+      avatar: user.avatar,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      phone: user.phone || null
+    };
 
-  const token = jwt.sign(payload, process.env.JWT_SECRET, {
-    expiresIn: '7d'
-  });
+    const token = jwt.sign(payload, process.env.JWT_SECRET, {
+      expiresIn: '7d'
+    });
 
-  res.json({
-    success: true,
-    message: 'Đăng nhập thành công',
-    token,
-    user: payload
-  });
+    let message = 'Đăng nhập Google thành công';
+
+    if (user.statusType === 'linkedExisting') {
+      message = 'Đăng nhập Google thành công, đã liên kết với tài khoản email cũ';
+    } else if (user.statusType === 'newGoogle') {
+      message = 'Đăng nhập Google thành công, tài khoản mới đã được tạo';
+    } else if (user.statusType === 'existingGoogle') {
+      message = 'Đăng nhập Google thành công, chào mừng trở lại!';
+    }
+
+    res.json({
+      success: true,
+      message,
+      token,
+      user: payload
+    });
+  } catch (error) {
+    console.error('❌ Lỗi trong googleCallback:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi server khi xử lý callback Google',
+      error: error.message || error
+    });
+  }
 };
 
-// Đăng nhập thất bại
 const loginFailed = (req, res) => {
   res.status(401).json({
     success: false,
@@ -35,7 +52,6 @@ const loginFailed = (req, res) => {
   });
 };
 
-// Trạng thái đăng nhập từ token (JWT-based)
 const getStatus = (req, res) => {
   if (req.user) {
     return res.json({
@@ -51,12 +67,10 @@ const getStatus = (req, res) => {
   res.status(401).json({ isAuthenticated: false });
 };
 
-// Đăng xuất (JWT → client chỉ cần xoá token)
 const logout = (req, res) => {
   res.json({ success: true, message: 'Đăng xuất thành công (xóa token phía client)' });
 };
 
-// Route lấy thông tin cá nhân
 const getProfile = (req, res) => {
   res.json({
     success: true,
@@ -71,7 +85,6 @@ const getProfile = (req, res) => {
   });
 };
 
-// Trang quản trị (chỉ dành cho admin)
 const getAdminDashboard = (req, res) => {
   res.json({
     success: true,

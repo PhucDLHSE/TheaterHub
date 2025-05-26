@@ -25,9 +25,35 @@ router.get('/google', (req, res, next) => {
 // Google OAuth: Callback sau khi xác thực
 router.get(
   '/google/callback',
-  passport.authenticate('google', { session: false, failureRedirect: '/auth/login-failed' }),
+  (req, res, next) => {
+    passport.authenticate('google', { session: false }, (err, user, info) => {
+      if (err) {
+        console.error('❌ Passport Google Error:', err);
+        return res.status(500).json({
+          success: false,
+          error_code: 'SERVER_ERROR',
+          message: 'Lỗi server trong quá trình xác thực Google'
+        });
+      }
+
+      if (!user) {
+        console.warn('⚠ Passport Google Info:', info?.message);
+        return res.status(401).json({
+          success: false,
+          error_code: 'GOOGLE_AUTH_FAILED',
+          message: info?.message || 'Đăng nhập Google thất bại'
+        });
+      }
+
+      // Đưa user vào req, chạy tiếp controller
+      req.user = user;
+      next();
+    })(req, res, next);
+  },
   googleCallback
 );
+
+
 
 // Đăng nhập thất bại
 router.get('/login-failed', loginFailed);
