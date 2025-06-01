@@ -4,7 +4,7 @@ const { verifyToken, ensureAdmin, ensureOwner } = require('../middlewares/jwtAut
 const userController = require('../controllers/userController');
 
 // Cập nhật số điện thoại người dùng đang đăng nhập
-router.put('/me/phone', verifyToken, userController.updatePhone);
+// router.put('/me/phone', verifyToken, userController.updatePhone);
 
 // Lấy danh sách tất cả người dùng (admin)
 router.get('/', verifyToken, ensureAdmin, userController.getAllUsers);
@@ -12,8 +12,8 @@ router.get('/', verifyToken, ensureAdmin, userController.getAllUsers);
 // Tìm kiếm người dùng (admin)
 router.get('/search', verifyToken, ensureAdmin, userController.searchUsers);
 
-// Lấy thông tin người dùng theo ID
-router.get('/:id', verifyToken, userController.getUserById);
+// Lấy thông tin người dùng theo ID {admin}
+router.get('/:id', verifyToken, ensureAdmin, userController.getUserById);
 
 // Cập nhật thông tin người dùng (chính chủ hoặc admin)
 router.put('/:id', verifyToken, ensureOwner(), userController.updateUser);
