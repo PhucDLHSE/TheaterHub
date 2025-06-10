@@ -3,26 +3,22 @@ const router = express.Router();
 const { verifyToken, ensureAdmin, ensureOwner } = require('../middlewares/jwtAuth');
 const userController = require('../controllers/userController');
 
-// Cập nhật số điện thoại người dùng đang đăng nhập
-// router.put('/me/phone', verifyToken, userController.updatePhone);
-
-// Lấy danh sách tất cả người dùng (admin)
 router.get('/', verifyToken, ensureAdmin, userController.getAllUsers);
-
-// Tìm kiếm người dùng (admin)
 router.get('/search', verifyToken, ensureAdmin, userController.searchUsers);
-
-// Lấy thông tin người dùng theo ID {admin}
+router.get('/me', verifyToken, userController.getCurrentUser);
 router.get('/:id', verifyToken, ensureAdmin, userController.getUserById);
 
-// Cập nhật thông tin người dùng (chính chủ hoặc admin)
 router.put('/:id', verifyToken, ensureOwner(), userController.updateUser);
+router.patch('/update-profile', verifyToken, userController.updateProfile);
+// router.delete('/:id', verifyToken, ensureAdmin, userController.deleteUser);
 
-// Cập nhật số điện thoại người dùng (chính chủ)
-router.patch('/update-phone', verifyToken, userController.updatePhone);
+// 🔒 Bổ sung các API bảo mật
+router.patch('/change-password', verifyToken, userController.changePassword);
+router.post('/forgot-password', userController.forgotPassword);
+router.post('/reset-password', userController.resetPassword);
+router.patch('/:id/lock', verifyToken, ensureAdmin, userController.lockUser);
 
-// Xóa người dùng (admin)
-router.delete('/:id', verifyToken, ensureAdmin, userController.deleteUser);
+router.patch('/role/:id', verifyToken, ensureAdmin, userController.updateUserRole);
 
 
 module.exports = router;

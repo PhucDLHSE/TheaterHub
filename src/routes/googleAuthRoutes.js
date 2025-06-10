@@ -45,7 +45,6 @@ router.get(
         });
       }
 
-      // Đưa user vào req, chạy tiếp controller
       req.user = user;
       next();
     })(req, res, next);

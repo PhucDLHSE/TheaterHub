@@ -1,48 +1,58 @@
 const jwt = require("jsonwebtoken");
 
 const googleCallback = (req, res) => {
-	try {
-		const user = req.user;
+  try {
+    const user = req.user;
 
-		const payload = {
-			user_id: user.user_id,
-			avatar: user.avatar,
-			name: user.name,
-			email: user.email,
-			role: user.role,
-			phone: user.phone || null,
-		};
+    const payload = {
+      user_id: user.user_id,
+      avatar: user.avatar,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      phone: user.phone || null,
+    };
 
-		const token = jwt.sign(payload, process.env.JWT_SECRET, {
-			expiresIn: "7d",
-		});
+    const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: "7d" });
 
-		let message = "Đăng nhập Google thành công";
+    let message = "Đăng nhập Google thành công";
 
-		if (user.statusType === "linkedExisting") {
-			message =
-				"Đăng nhập Google thành công, đã liên kết với tài khoản email cũ";
-		} else if (user.statusType === "newGoogle") {
-			message = "Đăng nhập Google thành công, tài khoản mới đã được tạo";
-		} else if (user.statusType === "existingGoogle") {
-			message = "Đăng nhập Google thành công, chào mừng trở lại!";
-		}
+    if (user.statusType === "linkedExisting") {
+      message = "Đăng nhập Google thành công, đã liên kết với tài khoản email cũ";
+    } else if (user.statusType === "newGoogle") {
+      message = "Đăng nhập Google thành công, tài khoản mới đã được tạo";
+    } else if (user.statusType === "existingGoogle") {
+      message = "Đăng nhập Google thành công, chào mừng trở lại!";
+    }
 
-		const encodedUser = encodeURIComponent(JSON.stringify(payload)); // Encode the user payload (JSON string) for safe URL transmission
-		const encodedMessage = encodeURIComponent(message); // Encode the success message for safe URL transmission
+    const callbackMode = process.env.OAUTH_CALLBACK_MODE || "MAIN"; // default to redirect
 
-		const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000"; // Use environment variable for frontend URL, default to localhost:3000 if not set
-		const redirectUrl = `${frontendUrl}?success=true&token=${token}&user=${encodedUser}&message=${encodedMessage}`;
+	// Nếu Backend đang chạy ở chế độ DEV, trả về JSON
+    if (callbackMode === "DEV") {
+      return res.json({
+        success: true,
+        message,                                                         
+        token,
+        user: payload
+      });
+    }
 
-		res.redirect(redirectUrl);
-	} catch (error) {
-		console.error("❌ Lỗi trong googleCallback:", error);
-		res.status(500).json({
-			success: false,
-			message: "Lỗi server khi xử lý callback Google",
-			error: error.message || error,
-		});
-	}
+    // Nếu Frontend đang chạy ở chế độ MAIN, chuyển hướng Frontend
+    const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
+    const encodedUser = encodeURIComponent(JSON.stringify(payload));
+    const encodedMessage = encodeURIComponent(message);
+    const redirectUrl = `${frontendUrl}?success=true&token=${token}&user=${encodedUser}&message=${encodedMessage}`;
+
+    return res.redirect(redirectUrl);
+
+  } catch (error) {
+    console.error("❌ Lỗi callback Google:", error);
+    res.status(500).json({
+      success: false,
+      message: "Lỗi server khi xử lý callback Google",
+      error: error.message || error,
+    });
+  }
 };
 
 const loginFailed = (req, res) => {
