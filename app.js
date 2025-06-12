@@ -11,6 +11,7 @@ const userRoutes = require('./src/routes/userRoutes');
 // const phoneAuthRoutes = require('./src/routes/phoneAuthRoutes');
 const phoneOtpRoutes = require('./src/routes/phoneOtpRoutes');
 const emailAuthRoutes = require('./src/routes/emailAuthRoutes');
+const organizerRoutes = require('./src/routes/organizerRoutes'); 
 
 // Đọc biến môi trường
 dotenv.config();
@@ -39,6 +40,8 @@ app.use('/api/users', userRoutes);
 // app.use('/api/phone-auth', phoneAuthRoutes);  
 app.use('/api/phone-otp', phoneOtpRoutes);
 app.use('/api/email-auth', emailAuthRoutes);
+app.use('/api/organizers', organizerRoutes);
+
 
 // Route chính
 app.get('/', (req, res) => {

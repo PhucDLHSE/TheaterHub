@@ -88,7 +88,6 @@ const updateProfile = async (req, res) => {
   const { name, phone, avatar } = req.body;
 
   try {
-    // Lấy thông tin người dùng từ DB
     const [rows] = await pool.query('SELECT * FROM users WHERE user_id = ?', [userId]);
     if (rows.length === 0) {
       return res.status(404).json({ success: false, message: 'Không tìm thấy người dùng' });
@@ -96,7 +95,7 @@ const updateProfile = async (req, res) => {
 
     const user = rows[0];
 
-    // Nếu là tài khoản Google OAuth (không có password) → chỉ cho phép cập nhật phone
+    // Nếu là tài khoản Google OAuth → chỉ cho phép cập nhật phone
     if (!user.password) {
       if (!phone) {
         return res.status(400).json({ success: false, message: 'Tài khoản Google chỉ được phép cập nhật số điện thoại' });
@@ -106,7 +105,7 @@ const updateProfile = async (req, res) => {
       return res.json({ success: true, message: 'Cập nhật số điện thoại thành công', phone });
     }
 
-    // Nếu là tài khoản thông thường → cập nhật name, phone, avatar
+    // Nếu là tài khoản thông thường → name, phone, avatar
     await pool.query('UPDATE users SET name = ?, phone = ?, avatar = ? WHERE user_id = ?', [name, phone, avatar, userId]);
     res.json({ success: true, message: 'Cập nhật thông tin thành công' });
   } catch (error) {
@@ -114,7 +113,6 @@ const updateProfile = async (req, res) => {
     res.status(500).json({ success: false, message: 'Lỗi server' });
   }
 };
-
 
 
 // Đổi mật khẩu
