@@ -27,7 +27,6 @@ const createOrganizer = async (req, res) => {
   }
 };
 
-
 const deleteFromFirebase = async (url) => {
   if (!url) return;
 
@@ -49,8 +48,6 @@ const deleteFromFirebase = async (url) => {
     console.warn("⚠️ Không thể xóa ảnh cũ:", error.message);
   }
 };
-
-
 
 const updateOrganizer = async (req, res) => {
   try {
@@ -89,9 +86,88 @@ const updateOrganizer = async (req, res) => {
   }
 };
 
+// GET /api/organizers
+const getAllOrganizers = async (req, res) => {
+  try {
+    const { search = "", sort = "" } = req.query;
 
+    let sql = "SELECT * FROM organizers";
+    const params = [];
+
+    // 🔍 Tìm kiếm theo tên
+    if (search) {
+      sql += " WHERE name LIKE ?";
+      params.push(`%${search}%`);
+    }
+
+    // 🔃 Sắp xếp
+    if (sort) {
+      const [field, direction] = sort.split("_");
+      const validFields = ["name", "organizer_id"];
+      const validDirections = ["asc", "desc"];
+
+      if (validFields.includes(field) && validDirections.includes(direction.toLowerCase())) {
+        sql += ` ORDER BY ${field} ${direction.toUpperCase()}`;
+      }
+    }
+
+    const [rows] = await db.query(sql, params);
+    res.json(rows);
+  } catch (err) {
+    console.error("❌ Lỗi khi lấy danh sách organizers:", err);
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// GET /api/organizers/:id
+const getOrganizerById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const [rows] = await db.query("SELECT * FROM organizers WHERE organizer_id = ?", [id]);
+
+    if (rows.length === 0) {
+      return res.status(404).json({ error: "Organizer not found" });
+    }
+
+    res.json(rows[0]);
+  } catch (err) {
+    console.error("❌ Lỗi khi lấy organizer:", err);
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// DELETE /api/organizers/:id
+const deleteOrganizer = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Kiểm tra organizer tồn tại chưa
+    const [rows] = await db.query("SELECT * FROM organizers WHERE organizer_id = ?", [id]);
+    if (rows.length === 0) {
+      return res.status(404).json({ error: "Organizer not found" });
+    }
+
+    const logoUrl = rows[0].logo_url;
+
+    // Xóa ảnh logo khỏi Firebase nếu có
+    if (logoUrl) {
+      await deleteFromFirebase(logoUrl);
+    }
+
+    // Xóa organizer khỏi DB
+    await db.query("DELETE FROM organizers WHERE organizer_id = ?", [id]);
+
+    res.json({ message: "Organizer deleted successfully" });
+  } catch (err) {
+    console.error("❌ Lỗi khi xóa organizer:", err);
+    res.status(500).json({ error: err.message });
+  }
+};
 
 module.exports = { 
     createOrganizer, 
-    updateOrganizer
+    updateOrganizer,
+    getAllOrganizers,
+    getOrganizerById,
+    deleteOrganizer
 };

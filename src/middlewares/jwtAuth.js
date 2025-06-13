@@ -24,6 +24,12 @@ const ensureAdmin = (req, res, next) => {
   res.status(403).json({ success: false, message: 'Không đủ quyền truy cập' });
 };
 
+// Middleware để kiểm tra quyền staff
+const ensureStaff = (req, res, next) => {
+  if (req.user?.role === 'staff') return next();
+  res.status(403).json({ success: false, message: 'Không đủ quyền truy cập' });
+};
+
 // Middleware để kiểm tra quyền sở hữu tài nguyên
 const ensureOwner = (paramName = 'userId') => {
   return (req, res, next) => {
@@ -40,5 +46,6 @@ const ensureOwner = (paramName = 'userId') => {
 module.exports = {
   verifyToken,
   ensureAdmin,
-  ensureOwner
+  ensureOwner,
+  ensureStaff
 };
