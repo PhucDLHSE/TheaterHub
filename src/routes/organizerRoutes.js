@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const upload = require("../middlewares/uploadMiddleware");
+const {upload} = require("../middlewares/uploadMiddleware");
 const { verifyToken, ensureStaff, ensureOwner } = require('../middlewares/jwtAuth');
 const { createOrganizer, updateOrganizer,getAllOrganizers, getOrganizerById, deleteOrganizer } = require("../controllers/organizerController");
 

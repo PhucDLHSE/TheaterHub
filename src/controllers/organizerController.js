@@ -3,6 +3,7 @@ const pool = require("../config/db");
 const db = require("../config/db"); 
 const { bucket } = require("../config/firebase");
 
+// POST /api/organizers
 const createOrganizer = async (req, res) => {
   try {
     const { name, description } = req.body;
@@ -27,6 +28,7 @@ const createOrganizer = async (req, res) => {
   }
 };
 
+// Xóa ảnh cũ khỏi Firebase
 const deleteFromFirebase = async (url) => {
   if (!url) return;
 
@@ -49,6 +51,7 @@ const deleteFromFirebase = async (url) => {
   }
 };
 
+// PUT /api/organizers/:id
 const updateOrganizer = async (req, res) => {
   try {
     console.log("👉 Bắt đầu updateOrganizer");

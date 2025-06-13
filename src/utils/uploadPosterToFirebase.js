@@ -1,8 +1,8 @@
 const { bucket } = require("../config/firebase");
 
-const uploadToFirebase = async (file) => {
+const uploadPosterToFirebase = async (file) => {
   try {
-    const filename = `organizers/${Date.now()}-${file.originalname}`;
+    const filename = `events_poster/${Date.now()}-${file.originalname}`;
     const fileUpload = bucket.file(filename);
 
     await fileUpload.save(file.buffer, {
@@ -13,12 +13,12 @@ const uploadToFirebase = async (file) => {
     await fileUpload.makePublic();
 
     const publicUrl = `https://storage.googleapis.com/${bucket.name}/${filename}`;
-    console.log("✅ File uploaded to Firebase:", publicUrl);
+    console.log("✅ Event poster uploaded to Firebase:", publicUrl);
     return publicUrl;
   } catch (err) {
     console.error("❌ Firebase upload error:", err);
-    throw new Error("Upload to Firebase failed");
+    throw new Error("Upload event poster to Firebase failed");
   }
 };
 
-module.exports = uploadToFirebase;
+module.exports = uploadPosterToFirebase;
