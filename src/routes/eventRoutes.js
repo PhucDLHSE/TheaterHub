@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const { upload, eventUpload } = require("../middlewares/uploadMiddleware");
-const {createEvent} = require("../controllers/eventController");
+const { createEvent, getAllEvents } = require("../controllers/eventController");
 const { verifyToken, ensureStaff } = require("../middlewares/jwtAuth");
 
 router.post(
@@ -12,5 +12,7 @@ router.post(
   createEvent
 );
 
+// GET all events (public)
+router.get("/", getAllEvents);
 
 module.exports = router;

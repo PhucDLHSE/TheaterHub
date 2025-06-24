@@ -63,5 +63,17 @@ const createEvent = async (req, res) => {
   }
 };
 
+const getAllEvents = async (req, res) => {
+  try {
+    const [events] = await pool.query(`
+      SELECT event_id, title, event_type, organizer_id, category_id, poster_url, description, custom_location, status, created_at
+      FROM events
+      ORDER BY created_at DESC
+    `);
+    return res.status(200).json({ success: true, events });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: "Lỗi server", error });
+  }
+};
 
-module.exports = { createEvent };
+module.exports = { createEvent, getAllEvents };

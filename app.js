@@ -14,6 +14,14 @@ const emailAuthRoutes = require('./src/routes/emailAuthRoutes');
 const organizerRoutes = require('./src/routes/organizerRoutes'); 
 const eventCategoryRoutes = require('./src/routes/eventCategoryRoutes');
 const eventRoutes = require('./src/routes/eventRoutes');
+const roomRoutes = require('./src/routes/roomRoutes');
+const theaterRoutes = require('./src/routes/theaterRoutes');
+const seatTypeRoutes = require('./src/routes/seatTypeRoutes');
+const seatRoutes = require('./src/routes/seatRoutes');
+const showtimeRoutes = require('./src/routes/showtimeRoutes');
+const ticketTypeRoutes = require('./src/routes/ticketTypeRoutes');
+const ticketRoutes = require('./src/routes/ticketRoutes');
+
 
 // Đọc biến môi trường
 dotenv.config();
@@ -45,7 +53,13 @@ app.use('/api/email-auth', emailAuthRoutes);
 app.use('/api/organizers', organizerRoutes);
 app.use('/api/event-categories', eventCategoryRoutes);
 app.use('/api/events', eventRoutes);
-
+app.use('/api/rooms', roomRoutes);
+app.use('/api/theaters', theaterRoutes);
+app.use('/api/seat-types', seatTypeRoutes);
+app.use('/api/seats', seatRoutes);
+app.use('/api/showtimes', showtimeRoutes);
+app.use('/api/ticket-types', ticketTypeRoutes);
+app.use('/api/tickets', ticketRoutes);
 
 // Route chính
 app.get('/', (req, res) => {
