@@ -78,7 +78,7 @@ const createEvent = async (req, res) => {
 // GET /api/events
 const getAllEvents = async (req, res) => {
   try {
-    // 1. Truy vấn danh sách sự kiện
+    // 1. Lấy danh sách sự kiện + thông tin tổ chức + danh mục
     const [eventRows] = await pool.execute(`
       SELECT 
         e.event_id, e.title, e.poster_url, e.description, e.event_type,
@@ -91,7 +91,7 @@ const getAllEvents = async (req, res) => {
       ORDER BY e.created_at DESC
     `);
 
-    // 2. Truy vấn tất cả showtimes cùng location
+    // 2. Lấy danh sách showtimes + thông tin location
     const [showtimeRows] = await pool.execute(`
       SELECT 
         s.showtime_id, s.event_id, s.location_id, s.start_time,
@@ -100,19 +100,40 @@ const getAllEvents = async (req, res) => {
       LEFT JOIN locations l ON s.location_id = l.location_id
     `);
 
-    // 3. Gom showtimes theo event_id
-    const showtimesMap = {};
+    // 3. Lấy danh sách ticket types
+    const [ticketRows] = await pool.execute(`
+      SELECT 
+        ticket_type_id, showtime_id, type_name, price, quantity
+      FROM ticket_types
+    `);
+
+    // 4. Gộp ticket types theo showtime_id
+    const ticketMap = {};
+    for (const ticket of ticketRows) {
+      if (!ticketMap[ticket.showtime_id]) ticketMap[ticket.showtime_id] = [];
+      ticketMap[ticket.showtime_id].push({
+        ticket_type_id: ticket.ticket_type_id,
+        type_name: ticket.type_name,
+        price: ticket.price,
+        quantity: ticket.quantity,
+      });
+    }
+
+    // 5. Gộp showtimes theo event_id, đồng thời gắn ticket_types vào từng showtime
+    const showtimeMap = {};
     for (const show of showtimeRows) {
-      if (!showtimesMap[show.event_id]) showtimesMap[show.event_id] = [];
-      showtimesMap[show.event_id].push({
+      const showtime = {
         showtime_id: show.showtime_id,
         location_id: show.location_id,
         location_name: show.location_name,
         start_time: show.start_time,
-      });
+        ticket_types: ticketMap[show.showtime_id] || [],
+      };
+      if (!showtimeMap[show.event_id]) showtimeMap[show.event_id] = [];
+      showtimeMap[show.event_id].push(showtime);
     }
 
-    // 4. Gắn showtimes vào từng event
+    // 6. Gộp tất cả dữ liệu vào từng event
     const events = eventRows.map(event => ({
       event_id: event.event_id,
       title: event.title,
@@ -145,7 +166,7 @@ const getAllEvents = async (req, res) => {
         slug: event.category_slug,
       },
 
-      showtimes: showtimesMap[event.event_id] || [], 
+      showtimes: showtimeMap[event.event_id] || [],
     }));
 
     res.json({ success: true, events });
@@ -154,6 +175,7 @@ const getAllEvents = async (req, res) => {
     res.status(500).json({ success: false, message: "Lỗi server." });
   }
 };
+
 
 // 1.3 Xem chi tiết event
 // GET /api/events/:eventId
@@ -197,7 +219,7 @@ const getEventById = async (req, res) => {
         description = JSON.parse(row.description);
       } catch (err) {
         console.warn("⚠️ Không thể parse JSON từ description:", row.description);
-      }   
+      }
     } else if (typeof row.description === 'object' && row.description !== null) {
       description = row.description;
     }
@@ -216,14 +238,44 @@ const getEventById = async (req, res) => {
       [eventId]
     );
 
+    // 4. Lấy ticket_types thông qua showtimes
+    const [ticketTypeRows] = await pool.execute(
+      `SELECT 
+        tt.ticket_type_id,
+        tt.showtime_id,
+        tt.type_name,
+        tt.price,
+        tt.quantity
+      FROM ticket_types tt
+      JOIN showtimes s ON tt.showtime_id = s.showtime_id
+      WHERE s.event_id = ?`,
+      [eventId]
+    );
+
+    // 5. Gộp ticket_types theo showtime_id
+    const ticketTypesByShowtime = {};
+    for (const row of ticketTypeRows) {
+      if (!ticketTypesByShowtime[row.showtime_id]) {
+        ticketTypesByShowtime[row.showtime_id] = [];
+      }
+      ticketTypesByShowtime[row.showtime_id].push({
+        ticket_type_id: row.ticket_type_id,
+        type_name: row.type_name,
+        price: row.price,
+        quantity: row.quantity
+      });
+    }
+
+    // 6. Gán ticket_types vào từng showtime
     const showtimes = showtimeRows.map(item => ({
       showtime_id: item.showtime_id,
       location_id: item.location_id,
       location_name: item.location_name,
-      start_time: item.start_time
+      start_time: item.start_time,
+      ticket_types: ticketTypesByShowtime[item.showtime_id] || []
     }));
 
-    // 4. Tạo object kết quả
+    // 7. Tạo object kết quả
     const event = {
       event_id: row.event_id,
       title: row.title,
@@ -254,6 +306,7 @@ const getEventById = async (req, res) => {
     return res.status(500).json({ success: false, message: "Lỗi server" });
   }
 };
+
 
 //1.4 Cập nhật event
 // PATCH /api/events/:eventId
