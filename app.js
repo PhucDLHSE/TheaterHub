@@ -15,6 +15,7 @@ const organizerRoutes = require('./src/routes/organizerRoutes');
 const eventCategoryRoutes = require('./src/routes/eventCategoryRoutes');
 const eventRoutes = require('./src/routes/eventRoutes');
 const locationRoutes = require('./src/routes/locationRoutes');
+const showtimeRoutes = require('./src/routes/showtimeRoutes');
 
 // Đọc biến môi trường
 dotenv.config();
@@ -47,6 +48,7 @@ app.use('/api/organizers', organizerRoutes);
 app.use('/api/event-categories', eventCategoryRoutes);
 app.use('/api/events', eventRoutes);
 app.use('/api/location', locationRoutes); 
+app.use('/api', showtimeRoutes);
 
 
 // Route chính

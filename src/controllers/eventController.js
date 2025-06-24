@@ -78,22 +78,42 @@ const createEvent = async (req, res) => {
 // GET /api/events
 const getAllEvents = async (req, res) => {
   try {
-    const [rows] = await pool.execute(`
+    // 1. Truy vấn danh sách sự kiện
+    const [eventRows] = await pool.execute(`
       SELECT 
         e.event_id, e.title, e.poster_url, e.description, e.event_type,
         e.custom_location, e.status, e.created_at,
-
         o.organizer_id, o.name AS organizer_name, o.logo_url AS organizer_logo, o.description AS organizer_description,
-
         c.category_id, c.category_name, c.slug AS category_slug
-
       FROM events e
       LEFT JOIN organizers o ON e.organizer_id = o.organizer_id
       LEFT JOIN event_categories c ON e.category_id = c.category_id
       ORDER BY e.created_at DESC
     `);
 
-    const events = rows.map(event => ({
+    // 2. Truy vấn tất cả showtimes cùng location
+    const [showtimeRows] = await pool.execute(`
+      SELECT 
+        s.showtime_id, s.event_id, s.location_id, s.start_time,
+        l.name AS location_name
+      FROM showtimes s
+      LEFT JOIN locations l ON s.location_id = l.location_id
+    `);
+
+    // 3. Gom showtimes theo event_id
+    const showtimesMap = {};
+    for (const show of showtimeRows) {
+      if (!showtimesMap[show.event_id]) showtimesMap[show.event_id] = [];
+      showtimesMap[show.event_id].push({
+        showtime_id: show.showtime_id,
+        location_id: show.location_id,
+        location_name: show.location_name,
+        start_time: show.start_time,
+      });
+    }
+
+    // 4. Gắn showtimes vào từng event
+    const events = eventRows.map(event => ({
       event_id: event.event_id,
       title: event.title,
       poster_url: event.poster_url,
@@ -116,14 +136,16 @@ const getAllEvents = async (req, res) => {
         organizer_id: event.organizer_id,
         name: event.organizer_name,
         logo_url: event.organizer_logo,
-        description: event.organizer_description
+        description: event.organizer_description,
       },
 
       category: {
         category_id: event.category_id,
         category_name: event.category_name,
-        slug: event.category_slug
-      }
+        slug: event.category_slug,
+      },
+
+      showtimes: showtimesMap[event.event_id] || [], 
     }));
 
     res.json({ success: true, events });
@@ -133,13 +155,13 @@ const getAllEvents = async (req, res) => {
   }
 };
 
-
 // 1.3 Xem chi tiết event
 // GET /api/events/:eventId
 const getEventById = async (req, res) => {
   const { eventId } = req.params;
 
   try {
+    // 1. Lấy thông tin chính của sự kiện
     const [rows] = await pool.execute(
       `SELECT 
         e.event_id,
@@ -168,21 +190,40 @@ const getEventById = async (req, res) => {
 
     const row = rows[0];
 
+    // 2. Parse description nếu có
     let description = [];
-
     if (typeof row.description === 'string') {
       try {
         description = JSON.parse(row.description);
       } catch (err) {
         console.warn("⚠️ Không thể parse JSON từ description:", row.description);
-        description = [];
       }   
     } else if (typeof row.description === 'object' && row.description !== null) {
-        description = row.description;
-    } else {
-        description = [];
+      description = row.description;
     }
 
+    // 3. Lấy danh sách showtimes + location
+    const [showtimeRows] = await pool.execute(
+      `SELECT 
+        s.showtime_id,
+        s.location_id,
+        l.name AS location_name,
+        s.start_time
+      FROM showtimes s
+      LEFT JOIN locations l ON s.location_id = l.location_id
+      WHERE s.event_id = ?
+      ORDER BY s.start_time ASC`,
+      [eventId]
+    );
+
+    const showtimes = showtimeRows.map(item => ({
+      showtime_id: item.showtime_id,
+      location_id: item.location_id,
+      location_name: item.location_name,
+      start_time: item.start_time
+    }));
+
+    // 4. Tạo object kết quả
     const event = {
       event_id: row.event_id,
       title: row.title,
@@ -201,8 +242,10 @@ const getEventById = async (req, res) => {
 
       category: {
         category_id: row.category_id,
-        name: row.category_name
-      }
+        category_name: row.category_name
+      },
+
+      showtimes
     };
 
     return res.status(200).json({ success: true, event });
