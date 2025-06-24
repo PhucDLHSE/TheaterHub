@@ -1,4 +1,4 @@
-const uploadToFirebase = require("../utils/uploadToFirebase");
+const uploadToFirebase = require("../utils/uploadOrganizerToFirebase");
 const pool = require("../config/db");
 const db = require("../config/db"); 
 const { bucket } = require("../config/firebase");

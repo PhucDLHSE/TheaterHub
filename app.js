@@ -14,6 +14,7 @@ const emailAuthRoutes = require('./src/routes/emailAuthRoutes');
 const organizerRoutes = require('./src/routes/organizerRoutes'); 
 const eventCategoryRoutes = require('./src/routes/eventCategoryRoutes');
 const eventRoutes = require('./src/routes/eventRoutes');
+const locationRoutes = require('./src/routes/locationRoutes');
 
 // Đọc biến môi trường
 dotenv.config();
@@ -28,7 +29,7 @@ app.use(express.urlencoded({ extended: true }));
 // CORS cho API
 app.use(cors({
   origin: process.env.FRONTEND_URL || '*',
-  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
   credentials: true
 }));
 
@@ -45,6 +46,7 @@ app.use('/api/email-auth', emailAuthRoutes);
 app.use('/api/organizers', organizerRoutes);
 app.use('/api/event-categories', eventCategoryRoutes);
 app.use('/api/events', eventRoutes);
+app.use('/api/location', locationRoutes); 
 
 
 // Route chính
