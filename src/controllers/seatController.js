@@ -121,11 +121,10 @@ const getSeatsByShowtime = async (req, res) => {
       priceMap[p.seat_type_code] = p.price;
     }
 
-    // Gắn giá vào từng ghế
     const seatMap = seats.map(seat => ({
       ...seat,
       price: priceMap[seat.seat_type_code] || null,
-      status: 'available' // tạm mặc định là còn trống
+      status: 'available' 
     }));
 
     res.json({ success: true, seats: seatMap });
@@ -135,9 +134,54 @@ const getSeatsByShowtime = async (req, res) => {
   }
 };
 
+// PATCH - Cập nhật giá seat_prices cho 1 showtime
+const updateSeatPrices = async (req, res) => {
+  const showtime_id = req.body.showtime_id;
+
+  if (!showtime_id) {
+    return res.status(400).json({ success: false, message: "Thiếu showtime_id" });
+  }
+
+  const seat_prices = Object.entries(req.body)
+    .filter(([key]) => key !== "showtime_id")
+    .map(([seat_type_code, price]) => ({
+      seat_type_code,
+      price: parseFloat(price)
+    }))
+    .filter(sp => sp.seat_type_code && !isNaN(sp.price));
+
+  if (seat_prices.length === 0) {
+    return res.status(400).json({ success: false, message: "Không có seat_type nào hợp lệ để cập nhật" });
+  }
+
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+
+    for (const { seat_type_code, price } of seat_prices) {
+      await conn.query(
+        `INSERT INTO seat_prices (showtime_id, seat_type_code, price)
+         VALUES (?, ?, ?)
+         ON DUPLICATE KEY UPDATE price = VALUES(price)`,
+        [showtime_id, seat_type_code, price]
+      );
+    }
+
+    await conn.commit();
+    res.status(200).json({ success: true, message: "Cập nhật giá vé theo loại ghế thành công" });
+  } catch (err) {
+    await conn.rollback();
+    console.error("❌ Lỗi updateSeatPrices:", err);
+    res.status(500).json({ success: false, message: "Lỗi server" });
+  } finally {
+    conn.release();
+  }
+};
+
 module.exports = {
   createSeatType,
   createSeatsForLocation,
   setSeatPrices,
-  getSeatsByShowtime
+  getSeatsByShowtime, 
+  updateSeatPrices
 };

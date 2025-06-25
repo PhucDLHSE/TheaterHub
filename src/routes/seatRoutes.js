@@ -4,7 +4,8 @@ const {
     createSeatType, 
     createSeatsForLocation, 
     setSeatPrices,
-    getSeatsByShowtime
+    getSeatsByShowtime,
+    updateSeatPrices
 } = require('../controllers/seatController');
 const { verifyToken, ensureStaff } = require('../middlewares/jwtAuth');
 
@@ -18,8 +19,10 @@ router.post('/locations/seats', verifyToken, ensureStaff, createSeatsForLocation
 router.post('/events/showtimes/seat-prices', verifyToken, ensureStaff, setSeatPrices);
 
 // Lấy sơ đồ ghế theo showtime
-router.get('/seats/showtimes/:showtimeId', getSeatsByShowtime)
+router.get('/seats/showtimes/:showtimeId', getSeatsByShowtime);
 
+// Cập nhật giá vé theo loại ghế cho 1 showtime
+router.patch('/events/showtimes/seat-prices', verifyToken, ensureStaff, updateSeatPrices);
 
 
 module.exports = router;
