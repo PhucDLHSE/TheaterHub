@@ -2,18 +2,18 @@ const uploadPosterToFirebase = require("../utils/uploadPosterToFirebase");
 const uploadImageToFirebase = require("../utils/uploadImageEventToFirebase");
 const pool = require("../config/db"); 
 const { v4: uuidv4 } = require("uuid");
+const dayjs = require("dayjs");
+const utc = require("dayjs/plugin/utc");
+const timezone = require("dayjs/plugin/timezone");
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
 
 // 1. Tao event
 // POST /api/events
 const createEvent = async (req, res) => {
   try {
-    const {
-      title,
-      event_type,
-      organizer_id,
-      category_id,
-      description: rawDescription,
-    } = req.body;
+    const { title, event_type, organizer_id, category_id, description: rawDescription } = req.body;
 
     let posterUrl = null;
     if (req.files["poster"] && req.files["poster"][0]) {
@@ -21,24 +21,21 @@ const createEvent = async (req, res) => {
     }
 
     let description = req.body.description;
-
     if (typeof description === 'string') {
       try {
         description = JSON.parse(description);
-      }   catch (err) {
+      } catch (err) {
         return res.status(400).json({ message: "Mô tả không hợp lệ" });
       }
     }
 
-
-    
     const uploadedDescImages = [];
     if (req.files["description_images"]) {
       for (let file of req.files["description_images"]) {
         const ext = file.originalname?.split('.').pop() || 'jpg';
         const filename = `${uuidv4()}.${ext}`;
         const url = await uploadImageToFirebase(file, filename);
-      uploadedDescImages.push(url);
+        uploadedDescImages.push(url);
       }
     }
 
@@ -74,11 +71,11 @@ const createEvent = async (req, res) => {
   }
 };
 
+
 // 1.2 Xem tất cả event
 // GET /api/events
 const getAllEvents = async (req, res) => {
   try {
-    // 1. Lấy danh sách sự kiện + thông tin tổ chức + danh mục
     const [eventRows] = await pool.execute(`
       SELECT 
         e.event_id, e.title, e.poster_url, e.description, e.event_type,
@@ -91,7 +88,6 @@ const getAllEvents = async (req, res) => {
       ORDER BY e.created_at DESC
     `);
 
-    // 2. Lấy danh sách showtimes + thông tin location
     const [showtimeRows] = await pool.execute(`
       SELECT 
         s.showtime_id, s.event_id, s.location_id, s.start_time,
@@ -100,14 +96,16 @@ const getAllEvents = async (req, res) => {
       LEFT JOIN locations l ON s.location_id = l.location_id
     `);
 
-    // 3. Lấy danh sách ticket types
     const [ticketRows] = await pool.execute(`
       SELECT 
         ticket_type_id, showtime_id, type_name, price, quantity
       FROM ticket_types
     `);
 
-    // 4. Gộp ticket types theo showtime_id
+    const [seatPrices] = await pool.execute(`
+      SELECT showtime_id, seat_type_code, price FROM seat_prices
+    `);
+
     const ticketMap = {};
     for (const ticket of ticketRows) {
       if (!ticketMap[ticket.showtime_id]) ticketMap[ticket.showtime_id] = [];
@@ -119,21 +117,40 @@ const getAllEvents = async (req, res) => {
       });
     }
 
-    // 5. Gộp showtimes theo event_id, đồng thời gắn ticket_types vào từng showtime
+    const seatPriceMap = {};
+    for (const sp of seatPrices) {
+      if (!seatPriceMap[sp.showtime_id]) seatPriceMap[sp.showtime_id] = [];
+      seatPriceMap[sp.showtime_id].push({
+        seat_type_code: sp.seat_type_code,
+        price: sp.price
+      });
+    }
+
     const showtimeMap = {};
     for (const show of showtimeRows) {
       const showtime = {
         showtime_id: show.showtime_id,
         location_id: show.location_id,
         location_name: show.location_name,
-        start_time: show.start_time,
-        ticket_types: ticketMap[show.showtime_id] || [],
+        start_time: dayjs(show.start_time).tz("Asia/Ho_Chi_Minh").format(),
+        ticket_types: [],
+        seat_prices: []
       };
       if (!showtimeMap[show.event_id]) showtimeMap[show.event_id] = [];
       showtimeMap[show.event_id].push(showtime);
     }
 
-    // 6. Gộp tất cả dữ liệu vào từng event
+    for (const event of eventRows) {
+      const showtimes = showtimeMap[event.event_id] || [];
+      for (const showtime of showtimes) {
+        if (event.event_type === 'seated') {
+          showtime.seat_prices = seatPriceMap[showtime.showtime_id] || [];
+        } else {
+          showtime.ticket_types = ticketMap[showtime.showtime_id] || [];
+        }
+      }
+    }
+
     const events = eventRows.map(event => ({
       event_id: event.event_id,
       title: event.title,
@@ -144,13 +161,7 @@ const getAllEvents = async (req, res) => {
       created_at: event.created_at,
 
       description: typeof event.description === 'string'
-        ? (() => {
-            try {
-              return JSON.parse(event.description || '[]');
-            } catch {
-              return [];
-            }
-          })()
+        ? (() => { try { return JSON.parse(event.description || '[]'); } catch { return []; } })()
         : event.description || [],
 
       organizer: {
@@ -183,22 +194,12 @@ const getEventById = async (req, res) => {
   const { eventId } = req.params;
 
   try {
-    // 1. Lấy thông tin chính của sự kiện
     const [rows] = await pool.execute(
       `SELECT 
-        e.event_id,
-        e.title,
-        e.description,
-        e.event_type,
-        e.custom_location,
-        e.poster_url AS poster,
-        e.organizer_id,
-        o.name AS organizer_name,
-        o.logo_url AS organizer_logo,
-        e.category_id,
-        c.category_name AS category_name,
-        e.status,
-        e.created_at
+        e.event_id, e.title, e.description, e.event_type, e.custom_location, e.poster_url AS poster,
+        e.organizer_id, o.name AS organizer_name, o.logo_url AS organizer_logo,
+        e.category_id, c.category_name AS category_name,
+        e.status, e.created_at
       FROM events e
       LEFT JOIN organizers o ON e.organizer_id = o.organizer_id
       LEFT JOIN event_categories c ON e.category_id = c.category_id
@@ -211,48 +212,44 @@ const getEventById = async (req, res) => {
     }
 
     const row = rows[0];
-
-    // 2. Parse description nếu có
     let description = [];
     if (typeof row.description === 'string') {
       try {
         description = JSON.parse(row.description);
-      } catch (err) {
-        console.warn("⚠️ Không thể parse JSON từ description:", row.description);
-      }
+      } catch {}
     } else if (typeof row.description === 'object' && row.description !== null) {
       description = row.description;
     }
 
-    // 3. Lấy danh sách showtimes + location
     const [showtimeRows] = await pool.execute(
-      `SELECT 
-        s.showtime_id,
-        s.location_id,
-        l.name AS location_name,
-        s.start_time
-      FROM showtimes s
-      LEFT JOIN locations l ON s.location_id = l.location_id
-      WHERE s.event_id = ?
-      ORDER BY s.start_time ASC`,
+      `SELECT s.showtime_id, s.location_id, l.name AS location_name, s.start_time
+       FROM showtimes s
+       LEFT JOIN locations l ON s.location_id = l.location_id
+       WHERE s.event_id = ?
+       ORDER BY s.start_time ASC`,
       [eventId]
     );
 
-    // 4. Lấy ticket_types thông qua showtimes
     const [ticketTypeRows] = await pool.execute(
-      `SELECT 
-        tt.ticket_type_id,
-        tt.showtime_id,
-        tt.type_name,
-        tt.price,
-        tt.quantity
-      FROM ticket_types tt
-      JOIN showtimes s ON tt.showtime_id = s.showtime_id
-      WHERE s.event_id = ?`,
+      `SELECT tt.ticket_type_id, tt.showtime_id, tt.type_name, tt.price, tt.quantity
+       FROM ticket_types tt
+       JOIN showtimes s ON tt.showtime_id = s.showtime_id
+       WHERE s.event_id = ?`,
       [eventId]
     );
 
-    // 5. Gộp ticket_types theo showtime_id
+    const [seatPrices] = await pool.execute(
+      `SELECT showtime_id, seat_type_code, price FROM seat_prices
+       WHERE showtime_id IN (${showtimeRows.map(s => s.showtime_id).join(',') || 0})`
+    );
+
+    const [seats] = await pool.execute(
+      `SELECT s.seat_id, s.seat_row, s.seat_number, s.seat_type_code, s.location_id,
+              st.seat_type_name
+       FROM seats s
+       JOIN seat_types st ON s.seat_type_code = st.seat_type_code`
+    );
+
     const ticketTypesByShowtime = {};
     for (const row of ticketTypeRows) {
       if (!ticketTypesByShowtime[row.showtime_id]) {
@@ -266,16 +263,38 @@ const getEventById = async (req, res) => {
       });
     }
 
-    // 6. Gán ticket_types vào từng showtime
-    const showtimes = showtimeRows.map(item => ({
-      showtime_id: item.showtime_id,
-      location_id: item.location_id,
-      location_name: item.location_name,
-      start_time: item.start_time,
-      ticket_types: ticketTypesByShowtime[item.showtime_id] || []
-    }));
+    const seatPricesByShowtime = {};
+    for (const sp of seatPrices) {
+      if (!seatPricesByShowtime[sp.showtime_id]) seatPricesByShowtime[sp.showtime_id] = {};
+      seatPricesByShowtime[sp.showtime_id][sp.seat_type_code] = sp.price;
+    }
 
-    // 7. Tạo object kết quả
+    const showtimes = showtimeRows.map(item => {
+      const seatList = row.event_type === 'seated'
+        ? seats
+            .filter(s => s.location_id === item.location_id)
+            .map(s => ({
+              seat_id: s.seat_id,
+              seat_row: s.seat_row,
+              seat_number: s.seat_number,
+              seat_type_code: s.seat_type_code,
+              seat_type_name: s.seat_type_name,
+              price: seatPricesByShowtime[item.showtime_id]?.[s.seat_type_code] || null,
+              status: 'available'
+            }))
+        : [];
+
+      return {
+        showtime_id: item.showtime_id,
+        location_id: item.location_id,
+        location_name: item.location_name,
+        start_time: dayjs(item.start_time).tz("Asia/Ho_Chi_Minh").format(),
+        ticket_types: row.event_type === 'seated' ? [] : (ticketTypesByShowtime[item.showtime_id] || []),
+        seat_prices: row.event_type === 'seated' ? seatPricesByShowtime[item.showtime_id] || [] : [],
+        seats: seatList
+      };
+    });
+
     const event = {
       event_id: row.event_id,
       title: row.title,
@@ -285,18 +304,15 @@ const getEventById = async (req, res) => {
       status: row.status,
       custom_location: row.custom_location,
       created_at: row.created_at,
-
       organizer: {
         organizer_id: row.organizer_id,
         name: row.organizer_name,
         logo_url: row.organizer_logo
       },
-
       category: {
         category_id: row.category_id,
         category_name: row.category_name
       },
-
       showtimes
     };
 
@@ -306,7 +322,6 @@ const getEventById = async (req, res) => {
     return res.status(500).json({ success: false, message: "Lỗi server" });
   }
 };
-
 
 //1.4 Cập nhật event
 // PATCH /api/events/:eventId

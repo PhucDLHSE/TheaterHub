@@ -17,6 +17,7 @@ const eventRoutes = require('./src/routes/eventRoutes');
 const locationRoutes = require('./src/routes/locationRoutes');
 const showtimeRoutes = require('./src/routes/showtimeRoutes');
 const ticketTypeRoutes = require('./src/routes/ticketTypeRoutes');
+const seatRoutes = require('./src/routes/seatRoutes');
 
 // Đọc biến môi trường
 dotenv.config();
@@ -51,6 +52,7 @@ app.use('/api/events', eventRoutes);
 app.use('/api/location', locationRoutes); 
 app.use('/api', showtimeRoutes);
 app.use('/api', ticketTypeRoutes);
+app.use('/api', seatRoutes);
 
 
 
