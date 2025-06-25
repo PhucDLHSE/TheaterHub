@@ -1,51 +1,37 @@
 const express = require("express");
 const router = express.Router();
 const { upload, eventUpload, dynamicImageUpload } = require("../middlewares/uploadMiddleware");
-const {createEvent, getAllEvents, getEventById, updateEvent, updateEventDescriptionPartial, updateEventDescriptionForm} = require("../controllers/eventController");
-const { verifyToken, ensureStaff } = require("../middlewares/jwtAuth");
-
-router.post(
-  "/",
-  verifyToken,         // ✅ luôn để xác thực trước
-  ensureStaff,         // ✅ check role
-  eventUpload,         // ✅ Chỉ dùng 1 middleware multer
-  createEvent
-);
-
-router.get(
-  "/",
-  getAllEvents
-);
-
-router.get(
-  "/:eventId",
-  getEventById        
-);
-
-router.patch(
-  "/:eventId",
-  verifyToken,
-  ensureStaff,
-  eventUpload,
-  updateEvent
-);
-
-// //Dùng JSON
-// router.patch(
-//   "/:eventId/description",
-//   verifyToken,
-//   ensureStaff,
-//   updateEventDescriptionPartial
-// );
-
-router.patch(
-  "/:eventId/description-form",
-  verifyToken,
-  ensureStaff,
-  dynamicImageUpload, 
+const { verifyToken, ensureStaff, ensureAdmin } = require("../middlewares/jwtAuth");
+const {
+  createEvent, 
+  getAllEvents, 
+  getEventById, 
+  updateEvent, 
+  // updateEventDescriptionPartial, 
   updateEventDescriptionForm
-);
+} = require("../controllers/eventController");
+const { updateEventStatus } = require("../controllers/eventStatusController");
 
+// 1. Tạo sự kiện
+router.post("/", verifyToken, ensureStaff, eventUpload, createEvent);
+
+//`2. Lấy danh sách sự kiện
+router.get("/", verifyToken, ensureStaff, getAllEvents);
+
+// 3. Lấy chi tiết sự kiện theo ID
+router.get("/:eventId", verifyToken, ensureStaff, getEventById);
+
+// 4. Cập nhật sự kiện
+router.patch("/:eventId", verifyToken, ensureStaff, eventUpload, updateEvent);
+
+// //4. Cập nhật sự kiện Dùng JSON 
+// router.patch("/:eventId/description", verifyToken, ensureStaff, updateEventDescriptionPartial);
+
+// 5. Cập nhật mô tả sự kiện bằng form
+router.patch("/:eventId/description-form", verifyToken, ensureStaff, dynamicImageUpload, updateEventDescriptionForm);
+
+// 6. Cập nhật trạng thái sự kiện
+router.patch('/:eventId/status', verifyToken, upload.none(), updateEventStatus);
 
 
 module.exports = router;

@@ -113,10 +113,75 @@ const getShowtimeById = async (req, res) => {
   }
 };
 
+// 6. Lấy danh sách ghế và giá của showtime
+const getShowtimeSeatsWithPrice = async (req, res) => {
+  const { showtimeId } = req.params;
+
+  try {
+    // 1. Kiểm tra showtime
+    const [showtimeRows] = await pool.query(
+      `SELECT s.showtime_id, s.event_id, s.location_id, e.event_type
+       FROM showtimes s
+       JOIN events e ON s.event_id = e.event_id
+       WHERE s.showtime_id = ?`,
+      [showtimeId]
+    );
+
+    if (showtimeRows.length === 0) {
+      return res.status(404).json({ success: false, message: "Không tìm thấy suất chiếu" });
+    }
+
+    const { location_id, event_type } = showtimeRows[0];
+    if (event_type !== 'seated') {
+      return res.status(400).json({ success: false, message: "Suất chiếu này không áp dụng cho loại sự kiện chọn ghế (seated)" });
+    }
+
+    // 2. Lấy thông tin seat_prices của showtime đó
+    const [seatPrices] = await pool.query(
+      `SELECT seat_type_code, price FROM seat_prices WHERE showtime_id = ?`,
+      [showtimeId]
+    );
+    const priceMap = {};
+    seatPrices.forEach(row => priceMap[row.seat_type_code] = row.price);
+
+    // 3. Lấy danh sách tất cả ghế tại location đó
+    const [seats] = await pool.query(
+      `SELECT s.seat_id, s.seat_row, s.seat_number, s.seat_type_code, st.seat_type_name
+       FROM seats s
+       JOIN seat_types st ON s.seat_type_code = st.seat_type_code
+       WHERE s.location_id = ?
+       ORDER BY s.seat_row ASC, s.seat_number ASC`,
+      [location_id]
+    );
+
+    // 4. Trả về danh sách ghế + giá
+    const seatsWithPrice = seats.map(seat => ({
+      seat_id: seat.seat_id,
+      seat_row: seat.seat_row,
+      seat_number: seat.seat_number,
+      seat_type_code: seat.seat_type_code,
+      seat_type_name: seat.seat_type_name,
+      price: priceMap[seat.seat_type_code] || null,
+      status: 'available'
+    }));
+
+    res.json({
+      success: true,
+      showtime_id: parseInt(showtimeId),
+      location_id,
+      seats: seatsWithPrice
+    });
+  } catch (err) {
+    console.error("❌ Lỗi getShowtimeSeatsWithPrice:", err);
+    res.status(500).json({ success: false, message: "Lỗi server" });
+  }
+};
+
 module.exports = {
   createShowtime,
   getShowtimesByEvent,
   getShowtimeById,
   updateShowtime,
   deleteShowtime,
+  getShowtimeSeatsWithPrice
 };
