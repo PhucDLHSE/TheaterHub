@@ -86,7 +86,7 @@ const setSeatPrices = async (req, res) => {
   }
 };
 
-// 4. Lấy sơ đồ ghế + giá của 1 showtime
+// 4. Lấy sơ đồ ghế + giá + trạng thái của 1 showtime
 const getSeatsByShowtime = async (req, res) => {
   const { showtimeId } = req.params;
 
@@ -121,10 +121,35 @@ const getSeatsByShowtime = async (req, res) => {
       priceMap[p.seat_type_code] = p.price;
     }
 
+    // 0. Dọn dẹp các đơn hàng đã hết hạn
+    await pool.query(`
+    UPDATE ticket_orders SET status = 'expired'
+    WHERE status = 'reserved' AND expires_at < NOW()
+  `);
+
+  await pool.query(`
+    UPDATE tickets SET status = 'expired'
+  WHERE status = 'reserved'
+    AND order_id IN (
+      SELECT order_id FROM ticket_orders WHERE status = 'expired'
+    )
+  `);
+
+
+    // Lấy danh sách ghế đã được giữ (reserved, paid)
+    const [reserved] = await pool.query(
+      `SELECT seat_id, status FROM tickets 
+       WHERE showtime_id = ? AND status IN ('reserved', 'paid')`,
+      [showtimeId]
+    );
+    const reservedMap = {};
+    reserved.forEach(r => reservedMap[r.seat_id] = r.status);
+
+    // Gộp thông tin ghế
     const seatMap = seats.map(seat => ({
       ...seat,
       price: priceMap[seat.seat_type_code] || null,
-      status: 'available' 
+      status: reservedMap[seat.seat_id] || 'available'
     }));
 
     res.json({ success: true, seats: seatMap });
@@ -182,6 +207,6 @@ module.exports = {
   createSeatType,
   createSeatsForLocation,
   setSeatPrices,
-  getSeatsByShowtime, 
+  getSeatsByShowtime,
   updateSeatPrices
 };

@@ -233,61 +233,62 @@ const getPublicEventById = async (req, res) => {
 
 // 3. Lấy sơ đồ ghế của suất chiếu công khai
 // Chỉ áp dụng cho sự kiện có loại 'seated'
-const getPublicShowtimeSeats = async (req, res) => {
+const getPublicSeatsByShowtime = async (req, res) => {
   const { showtimeId } = req.params;
 
   try {
-    const [showtimeRows] = await pool.query(
-      `SELECT s.showtime_id, s.event_id, s.location_id, e.event_type
+    const [[showtime]] = await pool.query(
+      `SELECT s.location_id, e.event_type 
        FROM showtimes s
        JOIN events e ON s.event_id = e.event_id
        WHERE s.showtime_id = ? AND e.status = 'upcoming'`,
       [showtimeId]
     );
 
-    if (showtimeRows.length === 0) {
-      return res.status(404).json({ success: false, message: "Không tìm thấy suất chiếu hoặc sự kiện chưa được duyệt" });
+    if (!showtime || showtime.event_type !== 'seated') {
+      return res.status(404).json({ message: "Không tìm thấy showtime hoặc không phải dạng chọn ghế" });
     }
 
-    const { location_id, event_type } = showtimeRows[0];
-    if (event_type !== 'seated') {
-      return res.status(400).json({ success: false, message: "Suất chiếu này không thuộc sự kiện chọn ghế (seated)" });
-    }
-
-    const [seatPrices] = await pool.query(
-      `SELECT seat_type_code, price FROM seat_prices WHERE showtime_id = ?`,
+    // Lấy danh sách seat_id đang reserved và chưa hết hạn
+    const [reservedSeats] = await pool.query(
+      `SELECT t.seat_id 
+       FROM tickets t
+       JOIN ticket_orders o ON t.order_id = o.order_id
+       WHERE t.showtime_id = ? AND t.status = 'reserved' AND o.expires_at > NOW()`,
       [showtimeId]
     );
-    const priceMap = {};
-    seatPrices.forEach(row => priceMap[row.seat_type_code] = row.price);
+    const reservedSeatIds = reservedSeats.map(r => r.seat_id);
 
+    // Lấy toàn bộ ghế của location
     const [seats] = await pool.query(
       `SELECT s.seat_id, s.seat_row, s.seat_number, s.seat_type_code, st.seat_type_name
        FROM seats s
        JOIN seat_types st ON s.seat_type_code = st.seat_type_code
        WHERE s.location_id = ?
-       ORDER BY s.seat_row ASC, s.seat_number ASC`,
-      [location_id]
+       ORDER BY s.seat_row, s.seat_number`,
+      [showtime.location_id]
     );
 
-    const seatsWithPrice = seats.map(seat => ({
-      seat_id: seat.seat_id,
-      seat_row: seat.seat_row,
-      seat_number: seat.seat_number,
-      seat_type_code: seat.seat_type_code,
-      seat_type_name: seat.seat_type_name,
+    // Lấy giá theo loại ghế
+    const [prices] = await pool.query(
+      `SELECT seat_type_code, price FROM seat_prices WHERE showtime_id = ?`,
+      [showtimeId]
+    );
+    const priceMap = {};
+    for (const p of prices) {
+      priceMap[p.seat_type_code] = p.price;
+    }
+
+    // Gộp thông tin
+    const seatMap = seats.map(seat => ({
+      ...seat,
       price: priceMap[seat.seat_type_code] || null,
-      status: 'available'
+      status: reservedSeatIds.includes(seat.seat_id) ? 'reserved' : 'available'
     }));
 
-    res.json({
-      success: true,
-      showtime_id: parseInt(showtimeId),
-      location_id,
-      seats: seatsWithPrice
-    });
+    res.json({ success: true, seats: seatMap });
   } catch (err) {
-    console.error("❌ Lỗi getPublicShowtimeSeats:", err);
+    console.error("❌ Lỗi getPublicSeatsByShowtime:", err);
     res.status(500).json({ success: false, message: "Lỗi server" });
   }
 };
@@ -295,5 +296,5 @@ const getPublicShowtimeSeats = async (req, res) => {
 module.exports = {
   getAllPublicEvents,
   getPublicEventById,
-  getPublicShowtimeSeats
+  getPublicSeatsByShowtime
 };
