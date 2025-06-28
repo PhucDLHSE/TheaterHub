@@ -237,6 +237,7 @@ const getPublicSeatsByShowtime = async (req, res) => {
   const { showtimeId } = req.params;
 
   try {
+    // 1. Lấy thông tin showtime + event
     const [[showtime]] = await pool.query(
       `SELECT s.location_id, e.event_type 
        FROM showtimes s
@@ -249,17 +250,28 @@ const getPublicSeatsByShowtime = async (req, res) => {
       return res.status(404).json({ message: "Không tìm thấy showtime hoặc không phải dạng chọn ghế" });
     }
 
-    // Lấy danh sách seat_id đang reserved và chưa hết hạn
+    // 2. Ghế đã RESERVED (chưa thanh toán và chưa hết hạn)
     const [reservedSeats] = await pool.query(
-      `SELECT t.seat_id 
-       FROM tickets t
-       JOIN ticket_orders o ON t.order_id = o.order_id
-       WHERE t.showtime_id = ? AND t.status = 'reserved' AND o.expires_at > NOW()`,
+      `SELECT seat_id FROM tickets
+       WHERE showtime_id = ?
+         AND status = 'reserved'
+         AND order_id IN (
+           SELECT order_id FROM ticket_orders
+           WHERE status = 'reserved' AND expires_at > NOW()
+         )`,
       [showtimeId]
     );
     const reservedSeatIds = reservedSeats.map(r => r.seat_id);
 
-    // Lấy toàn bộ ghế của location
+    // 3. Ghế đã PAID
+    const [paidSeats] = await pool.query(
+      `SELECT seat_id FROM tickets
+       WHERE showtime_id = ? AND status = 'paid'`,
+      [showtimeId]
+    );
+    const paidSeatIds = paidSeats.map(r => r.seat_id);
+
+    // 4. Lấy toàn bộ ghế trong location
     const [seats] = await pool.query(
       `SELECT s.seat_id, s.seat_row, s.seat_number, s.seat_type_code, st.seat_type_name
        FROM seats s
@@ -269,7 +281,7 @@ const getPublicSeatsByShowtime = async (req, res) => {
       [showtime.location_id]
     );
 
-    // Lấy giá theo loại ghế
+    // 5. Lấy giá từng loại ghế
     const [prices] = await pool.query(
       `SELECT seat_type_code, price FROM seat_prices WHERE showtime_id = ?`,
       [showtimeId]
@@ -279,11 +291,15 @@ const getPublicSeatsByShowtime = async (req, res) => {
       priceMap[p.seat_type_code] = p.price;
     }
 
-    // Gộp thông tin
+    // 6. Gộp thông tin ghế
     const seatMap = seats.map(seat => ({
       ...seat,
       price: priceMap[seat.seat_type_code] || null,
-      status: reservedSeatIds.includes(seat.seat_id) ? 'reserved' : 'available'
+      status: paidSeatIds.includes(seat.seat_id)
+        ? 'paid'
+        : reservedSeatIds.includes(seat.seat_id)
+          ? 'reserved'
+          : 'available'
     }));
 
     res.json({ success: true, seats: seatMap });

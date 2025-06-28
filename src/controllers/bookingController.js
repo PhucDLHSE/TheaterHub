@@ -116,7 +116,8 @@ const getOrderDetails = async (req, res) => {
              e.title AS event_title, l.name AS location_name, s.start_time
       FROM ticket_orders o
       JOIN events e ON o.event_id = e.event_id
-      JOIN showtimes s ON s.event_id = e.event_id
+      JOIN tickets t ON t.order_id = o.order_id
+      JOIN showtimes s ON t.showtime_id = s.showtime_id
       JOIN locations l ON s.location_id = l.location_id
       WHERE o.order_id = ? AND o.user_id = ?
     `, [orderId, user_id]);

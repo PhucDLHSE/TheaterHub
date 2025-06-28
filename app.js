@@ -5,6 +5,7 @@ const dotenv = require('dotenv');
 const configurePassport = require('./src/config/passport');
 const pool = require('./src/config/db');
 const whitelist = require('./src/config/roleWhitelist'); 
+const { confirmWebhook } = require('./src/utils/payos');
 
 const authRoutes = require('./src/routes/GoogleAuthRoutes');
 const userRoutes = require('./src/routes/userRoutes');
@@ -20,6 +21,7 @@ const ticketTypeRoutes = require('./src/routes/ticketTypeRoutes');
 const seatRoutes = require('./src/routes/seatRoutes');
 const publicEventRoutes = require('./src/routes/publicEventRoutes');
 const bookingRoutes = require('./src/routes/bookingRoutes');
+const paymentRoutes = require('./src/routes/paymentRoutes');
 
 // Đọc biến môi trường
 dotenv.config();
@@ -57,6 +59,7 @@ app.use('/api', ticketTypeRoutes);
 app.use('/api', seatRoutes);
 app.use('/api/public', publicEventRoutes);
 app.use('/api/bookings', bookingRoutes);
+app.use('/api/payments', paymentRoutes);
 
 
 
@@ -126,4 +129,5 @@ app.use((err, req, res, next) => {
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
   console.log(`Server đang chạy tại http://localhost:${PORT}`);
+  confirmWebhook();
 });
