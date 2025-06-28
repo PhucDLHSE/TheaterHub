@@ -133,11 +133,50 @@ const deleteLocation = async (req, res) => {
   }
 };
 
+// Lấy danh sách địa điểm không có ghế
+// (có thể dùng để kiểm tra các địa điểm chưa được sử dụng)
+const getLocationsWithoutSeats = async (req, res) => {
+  try {
+    const [rows] = await pool.query(`
+      SELECT l.location_id, l.name
+      FROM locations l
+      LEFT JOIN seats s ON l.location_id = s.location_id
+      WHERE s.seat_id IS NULL
+    `);
+    res.json({ success: true, locations: rows });
+  } catch (err) {
+    console.error("❌ Lỗi getLocationsWithoutSeats:", err);
+    res.status(500).json({ success: false, message: "Lỗi server" });
+  }
+};
+
+const getSeatedLocationsWithoutSeats = async (req, res) => {
+  try {
+    const [rows] = await pool.query(`
+      SELECT DISTINCT l.location_id, l.name
+      FROM showtimes s
+      JOIN events e ON s.event_id = e.event_id
+      JOIN locations l ON s.location_id = l.location_id
+      LEFT JOIN seats st ON st.location_id = l.location_id
+      WHERE e.event_type = 'seated'
+        AND st.seat_id IS NULL
+    `);
+    res.json({ success: true, locations: rows });
+  } catch (err) {
+    console.error("❌ Lỗi getSeatedLocationsWithoutSeats:", err);
+    res.status(500).json({ success: false, message: "Lỗi server" });
+  }
+};
+
+
+
 module.exports = {
   createLocation,
   getAllLocations,
   getLocationById,
   updateLocation,
-  deleteLocation
+  deleteLocation, 
+  getLocationsWithoutSeats,
+  getSeatedLocationsWithoutSeats
 };
 

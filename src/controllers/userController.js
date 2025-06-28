@@ -6,7 +6,7 @@ const { sendVerificationEmail, sendResetPasswordEmail } = require('../services/e
 // Lấy danh sách tất cả user (admin)
 const getAllUsers = async (req, res) => {
   try {
-    const [users] = await pool.query('SELECT user_id, name, email, phone, role, avatar, is_locked FROM users');
+    const [users] = await pool.query('SELECT user_id, name, email, phone, role, avatar, provider, email_verified, is_locked FROM users');
     res.json({ success: true, users });
   } catch (error) {
     console.error('❌ Lỗi getAllUsers:', error);
@@ -113,7 +113,6 @@ const updateProfile = async (req, res) => {
     res.status(500).json({ success: false, message: 'Lỗi server' });
   }
 };
-
 
 // Đổi mật khẩu
 const changePassword = async (req, res) => {
