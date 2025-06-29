@@ -52,12 +52,10 @@ router.get(
   googleCallback
 );
 
-
-
 // Đăng nhập thất bại
 router.get('/login-failed', loginFailed);
 
-// Đăng xuất (xóa token phía client)
+// Đăng xuất
 router.get('/logout', logout);
 
 // Kiểm tra trạng thái đăng nhập (dựa trên JWT)
