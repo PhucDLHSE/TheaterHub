@@ -43,24 +43,40 @@ const handlePayOSWebhook = async (req, res) => {
     const data = req.body.data;
     console.log("📩 Webhook PayOS:", data);
 
-    if (data.code === "00") {
+    if (data.code === "00" || data.status === "PAID") {
       const orderCode = data.orderCode;
 
-      // Cập nhật trạng thái đơn và vé
+      // 1. Cập nhật đơn và vé
       await pool.query(`UPDATE ticket_orders SET status = 'paid' WHERE order_id = ?`, [orderCode]);
       await pool.query(`UPDATE tickets SET status = 'paid' WHERE order_id = ?`, [orderCode]);
 
-      return res.status(200).json({ success: true, message: "Đã cập nhật trạng thái đơn hàng thành paid" });
+      // 2. Giảm số lượng vé theo ticket_type (chỉ áp dụng cho general hoặc zoned)
+      const [ticketTypeCounts] = await pool.query(`
+        SELECT ticket_type_id, COUNT(*) AS count
+        FROM tickets
+        WHERE order_id = ? AND ticket_type_id IS NOT NULL
+        GROUP BY ticket_type_id
+      `, [orderCode]);
+
+      for (const row of ticketTypeCounts) {
+        await pool.query(`
+          UPDATE ticket_types
+          SET quantity = GREATEST(quantity - ?, 0)
+          WHERE ticket_type_id = ?
+        `, [row.count, row.ticket_type_id]);
+      }
+
+      return res.status(200).json({ success: true, message: "Cập nhật trạng thái đơn hàng thành công" });
     }
 
-    res.status(200).json({ success: false, message: "Không xử lý trạng thái này" });
+    // Không xử lý các trạng thái khác
+    res.status(200).json({ success: false, message: "Trạng thái không xử lý" });
+
   } catch (err) {
     console.error("❌ Lỗi xử lý webhook:", err);
     res.status(500).json({ success: false, message: "Lỗi server khi xử lý webhook" });
   }
 };
-
-
 
 module.exports = {
   createPaymentLink,

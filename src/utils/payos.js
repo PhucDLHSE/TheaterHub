@@ -7,7 +7,7 @@ const payOS = new PayOS(
 );
 
 const confirmWebhook = async () => {
-  const webhookUrl = "https://8625-2a09-bac1-7ac0-10-00-246-cc.ngrok-free.app/api/payments/webhook";
+  const webhookUrl = `${process.env.WEBHOOKS_URL}/api/payments/webhook`;
   try {
     const result = await payOS.confirmWebhook(webhookUrl);
     console.log("✅ Webhook confirmed:", result);
