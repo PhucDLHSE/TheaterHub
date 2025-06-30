@@ -32,6 +32,8 @@ const createPaymentLink = async (req, res) => {
     };
 
     const paymentLink = await payOS.createPaymentLink(paymentRequest);
+    console.log("✅ Webhook URL:", `${process.env.WEBHOOKS_URL}/api/payment/webhook`);
+
 
     res.json({ success: true, paymentLink });
   } catch (error) {
