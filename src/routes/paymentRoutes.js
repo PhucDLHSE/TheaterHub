@@ -6,9 +6,9 @@ const { verifyToken } = require("../middlewares/jwtAuth");
 // Tạo link thanh toán
 router.post("/create-link", verifyToken, createPaymentLink);
 
-router.post('/webhook', handlePayOSWebhook);
+router.post('/payment/webhook', handlePayOSWebhook);
 
-router.get('/webhook', (req, res) => {
+router.get('/payment/webhook', (req, res) => {
   res.status(200).send('Webhook URL verified');
 });
 

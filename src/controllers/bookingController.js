@@ -58,7 +58,7 @@ const bookSeatedTickets = async (req, res) => {
     // 4. Tính tổng tiền
     let total = 0;
     const ticketData = seatRows.map(seat => {
-      const price = priceMap[seat.seat_type_code];
+      const price = Number(priceMap[seat.seat_type_code]);
       total += price;
       return {
         seat_id: seat.seat_id,
