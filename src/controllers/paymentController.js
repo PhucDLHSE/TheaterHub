@@ -98,8 +98,11 @@ const handlePayOSWebhook = async (req, res) => {
   GROUP BY u.email, e.title, l.name, s.start_time, tt.type_name
   LIMIT 1
 `, [orderId]);
+        console.log("📦 ticketInfo raw:", ticketInfo);
 
         const ticketInfo = rows[0];
+        console.log("📧 email:", ticketInfo?.email);
+
       if (ticketInfo && ticketInfo.email) {
         await sendTicketEmail(ticketInfo.email, {
         eventTitle: ticketInfo.event_title,
