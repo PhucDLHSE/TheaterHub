@@ -130,6 +130,6 @@ app.use((err, req, res, next) => {
 // Khởi chạy server
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
-  console.log(`Server đang chạy tại http://localhost:${PORT}`);
+  console.log(`Server đang chạy tại ${process.env.PORT}`);
   confirmWebhook();
 });

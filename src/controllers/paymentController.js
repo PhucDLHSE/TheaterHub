@@ -1,7 +1,5 @@
 const pool = require("../config/db");
 const { payOS } = require("../utils/payos");
-const { sendTicketEmail } = require('../services/emailService');
-
 
 const createPaymentLink = async (req, res) => {
   const user_id = req.user.user_id;
@@ -32,8 +30,6 @@ const createPaymentLink = async (req, res) => {
     };
 
     const paymentLink = await payOS.createPaymentLink(paymentRequest);
-    console.log("✅ Webhook URL:", `${process.env.WEBHOOKS_URL}/api/payment/webhook`);
-
 
     res.json({ success: true, paymentLink });
   } catch (error) {
@@ -50,17 +46,11 @@ const handlePayOSWebhook = async (req, res) => {
     if (data.code === "00" || data.status === "PAID") {
       const orderCode = data.orderCode;
 
-      // 1. Cập nhật đơn và vé sang 'paid'
-      await pool.query(
-        `UPDATE ticket_orders SET status = 'paid' WHERE order_id = ?`,
-        [orderCode]
-      );
-      await pool.query(
-        `UPDATE tickets SET status = 'paid' WHERE order_id = ?`,
-        [orderCode]
-      );
+      // 1. Cập nhật đơn và vé
+      await pool.query(`UPDATE ticket_orders SET status = 'paid' WHERE order_id = ?`, [orderCode]);
+      await pool.query(`UPDATE tickets SET status = 'paid' WHERE order_id = ?`, [orderCode]);
 
-      // 2. Giảm số lượng trong ticket_types (chỉ áp dụng với general hoặc zoned)
+      // 2. Giảm số lượng vé theo ticket_type (chỉ áp dụng cho general hoặc zoned)
       const [ticketTypeCounts] = await pool.query(`
         SELECT ticket_type_id, COUNT(*) AS count
         FROM tickets
@@ -76,38 +66,31 @@ const handlePayOSWebhook = async (req, res) => {
         `, [row.count, row.ticket_type_id]);
       }
 
-      // 3. Truy vấn thông tin người nhận vé
-      const [[order]] = await pool.query(`
-        SELECT u.email, u.name
-        FROM ticket_orders o
-        JOIN users u ON o.user_id = u.user_id
-        WHERE o.order_id = ?
+      // ✅ 3. Nếu có seats: cập nhật trạng thái seats từ reserved → paid
+      const [seatedTickets] = await pool.query(`
+        SELECT seat_id
+        FROM tickets
+        WHERE order_id = ? AND seat_id IS NOT NULL
       `, [orderCode]);
 
-      // 4. Truy vấn chi tiết vé
-      const [ticketDetails] = await pool.query(`
-        SELECT t.ticket_id, e.title AS event_title, s.start_time, l.name AS location_name,
-               tt.name AS ticket_type_name, t.seat_label
-        FROM tickets t
-        JOIN events e ON t.event_id = e.event_id
-        JOIN showtimes s ON t.showtime_id = s.showtime_id
-        JOIN locations l ON s.location_id = l.location_id
-        LEFT JOIN ticket_types tt ON t.ticket_type_id = tt.ticket_type_id
-        WHERE t.order_id = ?
-      `, [orderCode]);
+      if (seatedTickets.length > 0) {
+        const seatIds = seatedTickets.map(t => t.seat_id);
+        await pool.query(`
+          UPDATE seats
+          SET status = 'paid'
+          WHERE seat_id IN (?)
+        `, [seatIds]);
+      }
 
-      // 5. Gửi vé qua email
-      await sendTicketEmail(order.email, order.name, ticketDetails);
-
-      return res.status(200).json({ success: true, message: "Cập nhật đơn hàng và gửi vé thành công" });
+      return res.status(200).json({ success: true, message: "Cập nhật trạng thái đơn hàng thành công" });
     }
 
-    // Nếu không phải trạng thái cần xử lý
-    return res.status(200).json({ success: false, message: "Trạng thái không xử lý" });
+    // Không xử lý các trạng thái khác
+    res.status(200).json({ success: false, message: "Trạng thái không xử lý" });
 
   } catch (err) {
     console.error("❌ Lỗi xử lý webhook:", err);
-    return res.status(500).json({ success: false, message: "Lỗi server khi xử lý webhook" });
+    res.status(500).json({ success: false, message: "Lỗi server khi xử lý webhook" });
   }
 };
 
