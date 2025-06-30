@@ -1,5 +1,6 @@
 const pool = require("../config/db");
 const { payOS } = require("../utils/payos");
+const { sendTicketEmail } = require('./src/services/sendTicketEmail');
 
 const createPaymentLink = async (req, res) => {
   const user_id = req.user.user_id;
@@ -58,6 +59,9 @@ const handlePayOSWebhook = async (req, res) => {
         GROUP BY ticket_type_id
       `, [orderCode]);
 
+      // 4. Gửi email vé
+      await sendTicketEmail(order.email, order.name, ticketDetails);
+
       for (const row of ticketTypeCounts) {
         await pool.query(`
           UPDATE ticket_types
@@ -65,7 +69,27 @@ const handlePayOSWebhook = async (req, res) => {
           WHERE ticket_type_id = ?
         `, [row.count, row.ticket_type_id]);
       }
+      // 3. Truy vấn thông tin đơn hàng và danh sách vé
+      const [[order]] = await pool.query(`
+        SELECT u.email, u.name
+        FROM ticket_orders o
+        JOIN users u ON o.user_id = u.user_id
+        WHERE o.order_id = ?
+      `, [orderCode]);
 
+      const [ticketDetails] = await pool.query(`
+      SELECT t.ticket_id, e.title AS event_title, s.start_time, l.name AS location_name,
+          tt.name AS ticket_type_name, t.seat_label
+      FROM tickets t
+      JOIN events e ON t.event_id = e.event_id
+      JOIN showtimes s ON t.showtime_id = s.showtime_id
+      JOIN locations l ON s.location_id = l.location_id
+      LEFT JOIN ticket_types tt ON t.ticket_type_id = tt.ticket_type_id
+      WHERE t.order_id = ?
+      `, [orderCode]);
+
+      // 4. Gửi vé qua Email
+      await sendTicketEmail(order.email, order.name, ticketDetails);
       return res.status(200).json({ success: true, message: "Cập nhật trạng thái đơn hàng thành công" });
     }
 

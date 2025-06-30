@@ -25,7 +25,7 @@ const googleCallback = (req, res) => {
       message = "Đăng nhập Google thành công, chào mừng trở lại!";
     }
 
-    const callbackMode = process.env.OAUTH_CALLBACK_MODE || "MAIN"; // default to redirect
+    const callbackMode = process.env.OAUTH_CALLBACK_MODE || "MAIN"; 
 
 	// Nếu Backend đang chạy ở chế độ DEV, trả về JSON
     if (callbackMode === "DEV") {
@@ -84,7 +84,7 @@ const getStatus = (req, res) => {
 const logout = (req, res) => {
 	res.json({
 		success: true,
-		message: "Đăng xuất thành công (xóa token phía client)",
+		message: "Đăng xuất thành công",
 	});
 };
 
