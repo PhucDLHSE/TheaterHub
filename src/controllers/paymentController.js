@@ -1,5 +1,6 @@
 const pool = require("../config/db");
 const { payOS } = require("../utils/payos");
+const { sendTicketEmail } = require('../services/emailService');
 
 const createPaymentLink = async (req, res) => {
   const user_id = req.user.user_id;
@@ -79,6 +80,35 @@ const handlePayOSWebhook = async (req, res) => {
           SET quantity = GREATEST(quantity - ?, 0)
           WHERE ticket_type_id = ?
         `, [row.count, row.ticket_type_id]);
+      }
+
+      // 4. Gửi email vé cho người dùng
+      const [ticketInfo] = await pool.query(`
+        SELECT u.email, e.title AS event_title, l.name AS location_name, 
+               s.start_time, tt.name AS ticket_type_name, COUNT(t.ticket_id) AS quantity,
+               SUM(t.price) AS total_price
+        FROM tickets t
+        JOIN users u ON t.user_id = u.user_id
+        JOIN showtimes s ON t.showtime_id = s.showtime_id
+        JOIN events e ON s.event_id = e.event_id
+        JOIN locations l ON s.location_id = l.location_id
+        LEFT JOIN ticket_types tt ON t.ticket_type_id = tt.ticket_type_id
+        WHERE t.order_id = ?
+        GROUP BY u.email, e.title, l.name, s.start_time, tt.name
+        LIMIT 1
+      `, [orderId]);
+
+      if (ticketInfo && ticketInfo.email) {
+        await sendTicketEmail(ticketInfo.email, {
+          eventTitle: ticketInfo.event_title,
+          showtime: dayjs(ticketInfo.start_time).format('HH:mm DD/MM/YYYY'),
+          locationName: ticketInfo.location_name,
+          ticketTypeName: ticketInfo.ticket_type_name || 'Vé sự kiện',
+          quantity: ticketInfo.quantity,
+          totalAmount: ticketInfo.total_price,
+          qrCodeUrl: `https://yourdomain.com/qr/${orderId}`
+        });
+        console.log(`📨 Đã gửi email vé tới ${ticketInfo.email}`);
       }
 
       console.log(`✅ Đã xử lý webhook cho order_id = ${orderId}`);

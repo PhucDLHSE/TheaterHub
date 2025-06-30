@@ -1,4 +1,5 @@
 const nodemailer = require('nodemailer');
+const pool = require('../config/db'); 
 
 const transporter = nodemailer.createTransport({
     service: 'gmail',
@@ -80,61 +81,71 @@ const sendResetPasswordEmail = async (toEmail, otpCode) => {
     }
 };
 
-// ✅ Gửi email vé sau khi thanh toán
-const sendTicketEmail = async (toEmail, ticketInfo) => {
-    const {
-        name,               // Tên người mua
-        eventTitle,         // Tiêu đề sự kiện
-        eventTime,          // Chuỗi: "19:30 - 10/07/2025"
-        location,           // Tên địa điểm
-        seats,              // Mảng: ['Hàng A - Ghế 05', ...]
-        totalAmount,        // Chuỗi: "1.200.000đ"
-        ticketCode          // Mã vé (dùng tạo QR)
-    } = ticketInfo;
-
-    const qrImage = `https://api.qrserver.com/v1/create-qr-code/?data=THEATERHUB-${ticketCode}&size=200x200`;
-
-    const seatListHtml = seats.map(seat => `<li>${seat}</li>`).join("");
-
-    const mailOptions = {
-        from: `"TheaterHub" <${process.env.GMAIL_USER}>`,
-        to: toEmail,
-        subject: `🎟 Vé của bạn - ${eventTitle}`,
-        html: `
-            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; border: 1px solid #ddd; padding: 20px 30px; border-radius: 10px;">
-                <h2 style="color: #3F51B5; text-align: center;">🎭 TheaterHub - Xác nhận đặt vé</h2>
-                <p>Xin chào <strong>${name}</strong>,</p>
-                <p>Cảm ơn bạn đã đặt vé trên nền tảng TheaterHub!</p>
-
-                <div style="margin: 20px 0; line-height: 1.6;">
-                    <p><strong>Sự kiện:</strong> ${eventTitle}</p>
-                    <p><strong>Thời gian:</strong> ${eventTime}</p>
-                    <p><strong>Địa điểm:</strong> ${location}</p>
-                    <p><strong>Ghế của bạn:</strong></p>
-                    <ul>${seatListHtml}</ul>
-                    <p><strong>Tổng tiền:</strong> ${totalAmount}</p>
-                </div>
-
-                <div style="text-align: center; margin: 30px 0;">
-                    <img src="${qrImage}" alt="QR Code" />
-                    <p style="margin-top: 10px;">Mã vé: <strong>${ticketCode}</strong></p>
-                </div>
-
-                <p>Vui lòng mang email này hoặc mã QR khi đến sự kiện để được hỗ trợ check-in nhanh chóng.</p>
-
-                <div style="font-size: 12px; color: #777; text-align: center; margin-top: 40px;">
-                    Nếu có bất kỳ câu hỏi nào, vui lòng liên hệ với chúng tôi qua email: theaterhubservices@gmail.com
-                </div>
-            </div>
-        `
-    };
-
+// ✅ Gửi email vé đã đặt thành công
+const sendTicketEmail = async (orderId) => {
     try {
-        await transporter.sendMail(mailOptions);
-        console.log(`✅ Đã gửi email vé đến: ${toEmail}`);
+        const [rows] = await pool.query(
+            `SELECT 
+                u.name AS user_name,
+                u.email,
+                e.title AS event_title,
+                DATE_FORMAT(s.start_time, '%H:%i - %d/%m/%Y') AS event_time,
+                l.name AS location_name,
+                CONCAT('Hàng ', se.seat_row, ' - Ghế ', LPAD(se.seat_number, 2, '0')) AS seat_label,
+                o.total_amount
+            FROM ticket_orders o
+            JOIN users u ON o.user_id = u.user_id
+            JOIN tickets t ON o.order_id = t.order_id
+            JOIN seats se ON t.seat_id = se.seat_id
+            JOIN showtimes s ON t.showtime_id = s.showtime_id
+            JOIN events e ON o.event_id = e.event_id
+            JOIN locations l ON s.location_id = l.location_id
+            WHERE o.order_id = ?`,
+            [orderId]
+        );
+
+        if (!rows || rows.length === 0) {
+            console.error('❌ Không tìm thấy thông tin đơn hàng hoặc vé');
+            return false;
+        }
+
+        const {
+            user_name,
+            email,
+            event_title,
+            event_time,
+            location_name,
+            total_amount
+        } = rows[0];
+
+        const seats = rows.map(r => r.seat_label);
+
+        const html = `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; border: 1px solid #ddd; padding: 20px; border-radius: 10px;">
+                <h2 style="color: #2196F3; text-align: center;">🎟 Vé của bạn đã được xác nhận!</h2>
+                <p>Xin chào <strong>${user_name}</strong>,</p>
+                <p>Bạn đã đặt vé thành công cho sự kiện <strong>${event_title}</strong>.</p>
+                <p>
+                    <strong>Thời gian:</strong> ${event_time}<br>
+                    <strong>Địa điểm:</strong> ${location_name}<br>
+                    <strong>Ghế:</strong> ${seats.join(', ')}<br>
+                    <strong>Tổng tiền:</strong> ${Number(total_amount).toLocaleString()} VNĐ
+                </p>
+                <p>Cảm ơn bạn đã sử dụng dịch vụ TheaterHub. Chúc bạn có trải nghiệm tuyệt vời tại sự kiện!</p>
+            </div>
+        `;
+
+        await transporter.sendMail({
+            from: `"TheaterHub" <${process.env.GMAIL_USER}>`,
+            to: email,
+            subject: `🎭 Vé sự kiện "${event_title}" của bạn`,
+            html,
+        });
+
+        console.log(`✅ Email vé đã gửi tới: ${email}`);
         return true;
-    } catch (err) {
-        console.error(`❌ Lỗi gửi email vé:`, err);
+    } catch (error) {
+        console.error(`❌ Lỗi gửi email vé:`, error);
         return false;
     }
 };
