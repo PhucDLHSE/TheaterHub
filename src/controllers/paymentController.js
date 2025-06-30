@@ -47,8 +47,16 @@ const handlePayOSWebhook = async (req, res) => {
       const orderCode = data.orderCode;
 
       // 1. Cập nhật đơn và vé
-      await pool.query(`UPDATE ticket_orders SET status = 'paid' WHERE order_id = ?`, [orderCode]);
-      await pool.query(`UPDATE tickets SET status = 'paid' WHERE order_id = ?`, [orderCode]);
+      await pool.query(
+      `UPDATE ticket_orders SET status = 'paid' WHERE order_id = ?`,
+      [orderId]
+      );
+      await pool.query(
+      `UPDATE tickets
+      SET status = 'paid'
+      WHERE order_id = ?`,
+      [orderId]
+      );
 
       // 2. Giảm số lượng vé theo ticket_type (chỉ áp dụng cho general hoặc zoned)
       const [ticketTypeCounts] = await pool.query(`
@@ -64,22 +72,6 @@ const handlePayOSWebhook = async (req, res) => {
           SET quantity = GREATEST(quantity - ?, 0)
           WHERE ticket_type_id = ?
         `, [row.count, row.ticket_type_id]);
-      }
-
-      // ✅ 3. Nếu có seats: cập nhật trạng thái seats từ reserved → paid
-      const [seatedTickets] = await pool.query(`
-        SELECT seat_id
-        FROM tickets
-        WHERE order_id = ? AND seat_id IS NOT NULL
-      `, [orderCode]);
-
-      if (seatedTickets.length > 0) {
-        const seatIds = seatedTickets.map(t => t.seat_id);
-        await pool.query(`
-          UPDATE seats
-          SET status = 'paid'
-          WHERE seat_id IN (?)
-        `, [seatIds]);
       }
 
       return res.status(200).json({ success: true, message: "Cập nhật trạng thái đơn hàng thành công" });
