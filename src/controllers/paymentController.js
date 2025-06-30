@@ -1,6 +1,6 @@
 const pool = require("../config/db");
 const { payOS } = require("../utils/payos");
-const { sendTicketEmail } = require('../services/sendTicketEmail');
+const { sendTicketEmail } = require('../services/emailService');
 
 
 const createPaymentLink = async (req, res) => {
