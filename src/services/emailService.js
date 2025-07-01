@@ -96,7 +96,7 @@ const sendTicketEmail = async (orderId) => {
             FROM ticket_orders o
             JOIN users u ON o.user_id = u.user_id
             JOIN tickets t ON o.order_id = t.order_id
-            JOIN seats se ON t.seat_id = se.seat_id
+            LEFT JOIN seats se ON t.seat_id = se.seat_id
             JOIN showtimes s ON t.showtime_id = s.showtime_id
             JOIN events e ON o.event_id = e.event_id
             JOIN locations l ON s.location_id = l.location_id
@@ -105,7 +105,7 @@ const sendTicketEmail = async (orderId) => {
         );
 
         if (!rows || rows.length === 0) {
-            console.error('❌ Không tìm thấy thông tin đơn hàng hoặc vé');
+            console.warn('❌ Không tìm thấy thông tin đơn hàng hoặc vé');
             return false;
         }
 
@@ -118,7 +118,8 @@ const sendTicketEmail = async (orderId) => {
             total_amount
         } = rows[0];
 
-        const seats = rows.map(r => r.seat_label);
+        const seats = rows.map(r => r.seat_label).filter(Boolean); // tránh null
+        const seatInfo = seats.length > 0 ? `<strong>Ghế:</strong> ${seats.join(', ')}<br>` : '';
 
         const html = `
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; border: 1px solid #ddd; padding: 20px; border-radius: 10px;">
@@ -128,7 +129,7 @@ const sendTicketEmail = async (orderId) => {
                 <p>
                     <strong>Thời gian:</strong> ${event_time}<br>
                     <strong>Địa điểm:</strong> ${location_name}<br>
-                    <strong>Ghế:</strong> ${seats.join(', ')}<br>
+                    ${seatInfo}
                     <strong>Tổng tiền:</strong> ${Number(total_amount).toLocaleString()} VNĐ
                 </p>
                 <p>Cảm ơn bạn đã sử dụng dịch vụ TheaterHub. Chúc bạn có trải nghiệm tuyệt vời tại sự kiện!</p>
@@ -142,13 +143,16 @@ const sendTicketEmail = async (orderId) => {
             html,
         });
 
-        console.log(`✅ Email vé đã gửi tới: ${email}`);
+        console.log(`✅ Email vé đã gửi tới: ${email} (orderId: ${orderId})`);
         return true;
     } catch (error) {
-        console.error(`❌ Lỗi gửi email vé:`, error);
+        console.error(`❌ Lỗi gửi email vé cho orderId = ${orderId}:`, error);
         return false;
     }
 };
+
+module.exports = { sendTicketEmail };
+
 
 
 module.exports = {

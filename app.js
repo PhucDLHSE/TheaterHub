@@ -127,6 +127,11 @@ app.use((err, req, res, next) => {
   });
 });
 
+const { checkAndSendEmails } = require('./src/services/emailCronJob');
+setInterval(() => {
+    checkAndSendEmails();
+}, 60 * 1000);
+
 // Khởi chạy server
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
