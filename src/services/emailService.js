@@ -151,10 +151,6 @@ const sendTicketEmail = async (orderId) => {
     }
 };
 
-module.exports = { sendTicketEmail };
-
-
-
 module.exports = {
     sendVerificationEmail,
     sendResetPasswordEmail,
