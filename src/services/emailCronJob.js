@@ -23,10 +23,7 @@ const checkAndSendEmails = async () => {
     const sentOrderIds = loadSentOrders();
 
     const [rows] = await pool.query(
-        `SELECT order_id FROM ticket_orders 
-         WHERE status = 'paid' 
-         ORDER BY updated_at DESC 
-         LIMIT 50`
+        `SELECT order_id FROM ticket_orders WHERE status = 'paid' ORDER BY created_at DESC`
     );
 
     for (const row of rows) {
