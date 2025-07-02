@@ -71,7 +71,6 @@ const createEvent = async (req, res) => {
   }
 };
 
-
 // 1.2 Xem tất cả event
 // GET /api/events
 const getAllEvents = async (req, res) => {
@@ -530,6 +529,84 @@ const updateEventDescriptionForm = async (req, res) => {
   }
 };
 
+const removeVietnameseTones = (str) => {
+  return str
+    .normalize("NFD")                      // Tách dấu khỏi chữ cái
+    .replace(/[\u0300-\u036f]/g, "")      // Xóa các dấu thanh
+    .replace(/đ/g, "d").replace(/Đ/g, "D")// Đổi đ -> d
+    .toLowerCase();                       // Chuyển về chữ thường
+};
+
+const searchEvents = async (req, res) => {
+  try {
+    const { name, location, categorySlug } = req.query;
+
+    let sql = `
+      SELECT DISTINCT e.*
+      FROM events e
+      LEFT JOIN showtimes s ON e.event_id = s.event_id
+      LEFT JOIN locations l ON s.location_id = l.location_id
+      LEFT JOIN event_categories ec ON e.category_id = ec.category_id
+      WHERE 1=1
+    `;
+    const params = [];
+
+    if (name) {
+      const normalizedName = removeVietnameseTones(name);
+      sql += `
+        AND LOWER(
+          REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
+            REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
+              e.title,
+              'đ','d'),'Đ','D'),'á','a'),'à','a'),'ả','a'),'ã','a'),'ạ','a'),
+              'â','a'),'ấ','a'),'ầ','a'),'ậ','a'),'ẫ','a'),'ẩ','a'),
+              'ă','a'),'ắ','a'),'ằ','a')
+        ) LIKE ?
+      `;
+      params.push(`%${normalizedName}%`);
+    }
+
+    if (location) {
+      const normalizedLocation = removeVietnameseTones(location);
+      sql += `
+        AND (
+          LOWER(
+            REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
+              REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
+                l.name,
+                'đ','d'),'Đ','D'),'á','a'),'à','a'),'ả','a'),'ã','a'),'ạ','a'),
+                'â','a'),'ấ','a'),'ầ','a'),'ậ','a'),'ẫ','a'),'ẩ','a'),
+                'ă','a'),'ắ','a'),'ằ','a')
+          ) LIKE ?
+          OR
+          LOWER(
+            REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
+              REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
+                l.location,
+                'đ','d'),'Đ','D'),'á','a'),'à','a'),'ả','a'),'ã','a'),'ạ','a'),
+                'â','a'),'ấ','a'),'ầ','a'),'ậ','a'),'ẫ','a'),'ẩ','a'),
+                'ă','a'),'ắ','a'),'ằ','a')
+          ) LIKE ?
+        )
+      `;
+      params.push(`%${normalizedLocation}%`);
+      params.push(`%${normalizedLocation}%`);
+    }
+
+    if (categorySlug) {
+      sql += ` AND ec.slug = ? `;
+      params.push(categorySlug);
+    }
+
+    const [rows] = await pool.query(sql, params);
+    res.json({ success: true, data: rows });
+  } catch (error) {
+    console.error("Search error:", error);
+    res.status(500).json({ success: false, message: "Search failed" });
+  }
+};
+
+
 // //1.4 Nếu hàm 1.5 lỗi, dùng hàm này để cập nhật mô tả sự kiện theo từng phần tử (chỉ text)
 // const updateEventDescriptionPartial = async (req, res) => {
 //   const eventId = req.params.eventId;
@@ -588,5 +665,6 @@ module.exports = {
   getEventById,
   updateEvent,
   // updateEventDescriptionPartial,
-  updateEventDescriptionForm
+  updateEventDescriptionForm,
+  searchEvents
 };

@@ -8,15 +8,21 @@ const {
   getEventById, 
   updateEvent, 
   // updateEventDescriptionPartial, 
-  updateEventDescriptionForm
+  updateEventDescriptionForm,
+  searchEvents
 } = require("../controllers/eventController");
 const { updateEventStatus } = require("../controllers/eventStatusController");
+
+// Route tìm kiếm sự kiện với các bộ lọc linh hoạt
+router.get("/search", searchEvents);
 
 // 1. Tạo sự kiện
 router.post("/", verifyToken, ensureStaff, eventUpload, createEvent);
 
 //`2. Lấy danh sách sự kiện
 router.get("/", verifyToken, ensureStaff, getAllEvents);
+
+
 
 // 3. Lấy chi tiết sự kiện theo ID
 router.get("/:eventId", verifyToken, ensureStaff, getEventById);

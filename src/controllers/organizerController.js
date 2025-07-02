@@ -1,6 +1,6 @@
 const uploadToFirebase = require("../utils/uploadOrganizerToFirebase");
 const pool = require("../config/db");
-const db = require("../config/db"); 
+const db = require("../config/db");
 const { bucket } = require("../config/firebase");
 
 // POST /api/organizers
@@ -11,6 +11,18 @@ const createOrganizer = async (req, res) => {
     if (!req.file) {
       return res.status(400).json({ error: "Logo file is required" });
     }
+
+    console.log("📁 File info:", {
+      originalname: req.file.originalname,
+      mimetype: req.file.mimetype,
+      size: req.file.size
+    });
+
+    // Debug bucket
+    console.log("🪣 Bucket status:", {
+      exists: !!bucket,
+      name: bucket?.name
+    });
 
     const logoUrl = await uploadToFirebase(req.file);
 
