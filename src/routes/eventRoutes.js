@@ -22,8 +22,6 @@ router.post("/", verifyToken, ensureStaff, eventUpload, createEvent);
 //`2. Lấy danh sách sự kiện
 router.get("/", verifyToken, ensureStaff, getAllEvents);
 
-
-
 // 3. Lấy chi tiết sự kiện theo ID
 router.get("/:eventId", verifyToken, ensureStaff, getEventById);
 

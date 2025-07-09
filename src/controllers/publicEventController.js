@@ -309,8 +309,136 @@ const getPublicSeatsByShowtime = async (req, res) => {
   }
 };
 
+// 4. Lấy danh sách ticket types cho sự kiện dạng general
+const getGeneralTicketTypes = async (req, res) => {
+  const { eventId } = req.params;
+  try {
+    const [events] = await pool.execute(
+      `SELECT * FROM events WHERE event_id = ? AND event_type = 'general'`,
+      [eventId]
+    );
+
+    if (events.length === 0) {
+      return res.status(404).json({ message: 'Sự kiện không tồn tại hoặc không phải dạng general.' });
+    }
+
+    const [rows] = await pool.execute(`
+      SELECT 
+        s.showtime_id,
+        s.start_time,
+        l.name AS location_name,
+        l.location AS location_address,
+        tt.ticket_type_id,
+        tt.price,
+        tt.quantity
+      FROM showtimes s
+      JOIN locations l ON s.location_id = l.location_id
+      LEFT JOIN ticket_types tt ON s.showtime_id = tt.showtime_id
+      WHERE s.event_id = ?
+    `, [eventId]);
+
+    const showtimeMap = {};
+
+    for (const row of rows) {
+      if (!showtimeMap[row.showtime_id]) {
+        showtimeMap[row.showtime_id] = {
+          showtime_id: row.showtime_id,
+          start_time: row.start_time,
+          location_name: row.location_name,
+          location_address: row.location_address,
+          tickets: []
+        };
+      }
+
+      if (row.ticket_type_id) {
+        showtimeMap[row.showtime_id].tickets.push({
+          ticket_type_id: row.ticket_type_id,
+          price: row.price,
+          quantity: row.quantity
+        });
+      }
+    }
+
+    const result = Object.values(showtimeMap);
+
+    res.json({ event_id: eventId, showtimes: result });
+
+  } catch (error) {
+    console.error('Lỗi khi lấy ticket types cho general event:', error);
+    res.status(500).json({ message: 'Đã có lỗi xảy ra khi truy xuất dữ liệu.' });
+  }
+};
+
+// 5. Lấy danh sách ticket types cho sự kiện dạng zoned
+const getZonedTicketTypes = async (req, res) => {
+  const { eventId } = req.params;
+
+  try {
+    // 1. Kiểm tra event tồn tại và là dạng zoned
+    const [events] = await pool.execute(
+      `SELECT * FROM events WHERE event_id = ? AND event_type = 'zoned'`,
+      [eventId]
+    );
+
+    if (events.length === 0) {
+      return res.status(404).json({ message: 'Sự kiện không tồn tại hoặc không phải dạng zoned.' });
+    }
+
+    // 2. Lấy danh sách showtime + ticket_types (có type_name)
+    const [rows] = await pool.execute(`
+      SELECT 
+        s.showtime_id,
+        s.start_time,
+        l.name AS location_name,
+        l.location AS location_address,
+        tt.ticket_type_id,
+        tt.type_name,
+        tt.price,
+        tt.quantity
+      FROM showtimes s
+      JOIN locations l ON s.location_id = l.location_id
+      LEFT JOIN ticket_types tt ON s.showtime_id = tt.showtime_id
+      WHERE s.event_id = ?
+    `, [eventId]);
+
+    // 3. Gom nhóm theo showtime
+    const showtimeMap = {};
+
+    for (const row of rows) {
+      if (!showtimeMap[row.showtime_id]) {
+        showtimeMap[row.showtime_id] = {
+          showtime_id: row.showtime_id,
+          start_time: row.start_time,
+          location_name: row.location_name,
+          location_address: row.location_address,
+          ticket_types: []
+        };
+      }
+
+      if (row.ticket_type_id) {
+        showtimeMap[row.showtime_id].ticket_types.push({
+          ticket_type_id: row.ticket_type_id,
+          type_name: row.type_name,
+          price: row.price,
+          quantity: row.quantity
+        });
+      }
+    }
+
+    const result = Object.values(showtimeMap);
+
+    res.json({ event_id: eventId, showtimes: result });
+
+  } catch (error) {
+    console.error('Lỗi khi lấy ticket types cho zoned event:', error);
+    res.status(500).json({ message: 'Đã có lỗi xảy ra khi truy xuất dữ liệu.' });
+  }
+};
+
 module.exports = {
   getAllPublicEvents,
   getPublicEventById,
-  getPublicSeatsByShowtime
+  getPublicSeatsByShowtime,
+  getGeneralTicketTypes, 
+  getZonedTicketTypes
 };
