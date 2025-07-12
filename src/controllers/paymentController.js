@@ -27,8 +27,10 @@ const createPaymentLink = async (req, res) => {
       orderCode: order.order_id,
       amount: parseInt(order.total_amount),
       description: truncatedDescription,
-      returnUrl: "https://theaterhub.vn/thanh-toan/thanh-cong",
-      cancelUrl: "https://theaterhub.vn/thanh-toan/that-bai"
+      // returnUrl: "https://theaterhub.vn/thanh-toan/thanh-cong",
+      returnUrl: "http://localhost:3000",
+      // cancelUrl: "https://theaterhub.vn/thanh-toan/that-bai"
+      cancelUrl: "http://localhost:3000",
     };
 
     const paymentLink = await payOS.createPaymentLink(paymentRequest);
