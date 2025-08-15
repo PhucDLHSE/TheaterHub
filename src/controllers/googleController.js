@@ -38,7 +38,7 @@ const googleCallback = (req, res) => {
     }
 
     // Nếu Frontend đang chạy ở chế độ MAIN, chuyển hướng Frontend
-    const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
+    const frontendUrl = process.env.FRONTEND_URL || "https://theaterhub-frontend.vercel.app/";
     const encodedUser = encodeURIComponent(JSON.stringify(payload));
     const encodedMessage = encodeURIComponent(message);
     const redirectUrl = `${frontendUrl}?success=true&token=${token}&user=${encodedUser}&message=${encodedMessage}`;
