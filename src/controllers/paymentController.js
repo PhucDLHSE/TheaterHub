@@ -28,9 +28,9 @@ const createPaymentLink = async (req, res) => {
       amount: parseInt(order.total_amount),
       description: truncatedDescription,
       // returnUrl: "https://theaterhub.vn/thanh-toan/thanh-cong",
-      returnUrl: "http://localhost:3000/payment/result",
+      returnUrl: "https://theaterhub-frontend.vercel.app/",
       // cancelUrl: "https://theaterhub.vn/thanh-toan/that-bai"
-      cancelUrl: "http://localhost:3000",
+      cancelUrl: "https://theaterhub-frontend.vercel.app/",
     };
 
     const paymentLink = await payOS.createPaymentLink(paymentRequest);
